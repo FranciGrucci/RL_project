@@ -113,35 +113,35 @@ class DDPG_Agent:
         for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-# ---- ESPERIENZA NELL'AMBIENTE ----
-env = gym.make("CarRacing-v2", continuous=True)
-state_dim = env.observation_space.shape[0] * env.observation_space.shape[1] * env.observation_space.shape[2]  # Flatten immagine
-action_dim = env.action_space.shape[0]
-max_action = float(env.action_space.high[0])
+# # ---- ESPERIENZA NELL'AMBIENTE ----
+# env = gym.make("CarRacing-v2", continuous=True)
+# state_dim = env.observation_space.shape[0] * env.observation_space.shape[1] * env.observation_space.shape[2]  # Flatten immagine
+# action_dim = env.action_space.shape[0]
+# max_action = float(env.action_space.high[0])
 
-agent = DDPG_Agent(state_dim, action_dim, max_action)
+# agent = DDPG_Agent(state_dim, action_dim, max_action)
 
-# Addestramento
-num_episodes = 500
-for episode in range(num_episodes):
-    state, _ = env.reset()
-    state = np.array(state, dtype=np.float32).flatten()  # Flatten immagine
-    episode_reward = 0
+# # Addestramento
+# num_episodes = 500
+# for episode in range(num_episodes):
+#     state, _ = env.reset()
+#     state = np.array(state, dtype=np.float32).flatten()  # Flatten immagine
+#     episode_reward = 0
 
-    for step in range(1000):  # Limite max passi
-        action = agent.select_action(state)
-        next_state, reward, done, _, _ = env.step(action)
-        next_state = np.array(next_state, dtype=np.float32).flatten()
+#     for step in range(1000):  # Limite max passi
+#         action = agent.select_action(state)
+#         next_state, reward, done, _, _ = env.step(action)
+#         next_state = np.array(next_state, dtype=np.float32).flatten()
 
-        agent.replay_buffer.push(state, action, reward, next_state, done)
-        agent.train()
+#         agent.replay_buffer.push(state, action, reward, next_state, done)
+#         agent.train()
 
-        state = next_state
-        episode_reward += reward
+#         state = next_state
+#         episode_reward += reward
 
-        if done:
-            break
+#         if done:
+#             break
 
-    print(f"Episode {episode}, Reward: {episode_reward}")
+#     print(f"Episode {episode}, Reward: {episode_reward}")
 
-env.close()
+# env.close()

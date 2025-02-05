@@ -349,9 +349,13 @@ def train(n_episodes=2):
     """
     Addestra l'agente sull'ambiente CarRacing-v2 e salva il modello.
     """
-    agent = DDPG_Agent()
+    #agent = DDPG_Agent()
     env = gym.make("CarRacing-v2", continuous=True)
-    
+    state_dim = env.observation_space.shape[0] * env.observation_space.shape[1] * env.observation_space.shape[2]  # Flatten immagine
+    action_dim = env.action_space.shape[0]
+    max_action = float(env.action_space.high[0])
+
+    agent = DDPG_Agent(state_dim, action_dim, max_action)
     for episode in range(n_episodes):
         state, _ = env.reset()
         state = np.array(state, dtype=np.float32).flatten()
@@ -381,7 +385,6 @@ def main():
     parser.add_argument('-e', '--evaluate', action='store_true')
    
     args = parser.parse_args()
-    
     if args.train:
         train()
     
