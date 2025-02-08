@@ -26,7 +26,9 @@ class Actor(nn.Module):
         self.bn2 = nn.LayerNorm(self.fc2_dims)
         self.fc3 = nn.Linear(self.fc2_dims, self.n_actions)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
-        self.device = torch.device('cpu')
+        #self.device = torch.device("cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         self.to(self.device)
 
         if not os.path.exists(ckpt_dir):
@@ -63,7 +65,9 @@ class Critic(nn.Module):
         self.action_value = nn.Linear(self.n_actions, self.fc2_dims)
         self.q = nn.Linear(self.fc2_dims, 1)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
-        self.device = torch.device('cpu')
+        #self.device = torch.device('cpu')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         self.to(self.device)
 
 
