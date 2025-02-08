@@ -345,7 +345,7 @@ def evaluate(n_episodes=10, render=False):
     print(f"Media Reward: {np.mean(rewards)}")
     env.close()
 
-def train(n_episodes=2):
+def train(n_episodes=10):
     """
     Addestra l'agente sull'ambiente CarRacing-v2 e salva il modello.
     """

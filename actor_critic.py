@@ -35,6 +35,7 @@ class Actor(nn.Module):
             pathlib.Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
 
     def forward(self, state):
+        state = state.to(self.device)
         x = F.relu(self.bn1(self.fc1(state)))
         x = F.relu(self.bn2(self.fc2(x)))
         x = torch.tanh(self.fc3(x)) # Azioni in [-1, 1]
@@ -78,6 +79,7 @@ class Critic(nn.Module):
     #     state_action_value = F.relu(torch.add(state_value, action_value))
     #     return self.q(state_action_value)
     def forward(self, state, action):
+        state = state.to(self.device)
         state_value = self.fc1(state)
         state_value = self.bn1(state_value)
         state_value = F.relu(state_value)

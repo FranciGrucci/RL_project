@@ -26,6 +26,7 @@ class DDPG_Agent:
         self.gamma = gamma
         self.tau = tau
         self.max_action = max_action
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def save(self, filename="ddpg_checkpoint.pth"):
         """Salva i parametri delle reti dell'agente."""
@@ -49,10 +50,10 @@ class DDPG_Agent:
 
 
     def select_action(self, state, noise=0.1):
-        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
-        action = self.actor(state).detach().numpy()[0]
+        state = torch.tensor(state, dtype=torch.float32,device=self.device).unsqueeze(0)
+        action = self.actor(state).detach().cpu().numpy()[0]
         action = action + np.random.normal(0, noise, size=action.shape)  # Esplorazione
-        return np.clip(action, -self.max_action, self.max_action)  # Limita le azioni
+        return action #np.clip(action, -self.max_action, self.max_action)  # Limita le azioni
 
     def train(self, batch_size=64):
         if self.replay_buffer.size() < batch_size:
@@ -64,10 +65,12 @@ class DDPG_Agent:
         with torch.no_grad():
             next_actions = self.actor_target(next_states)
             target_Q = self.critic_target(next_states, next_actions)
-            target_Q = rewards + (1 - dones) * self.gamma * target_Q
+            #print(type(target_Q))
+            #print("ELLE",(rewards.get_device(), dones.get_device(),target_Q.get_device()))
+            target_Q = rewards.to(self.device) + (1 - dones.to(self.device)) * self.gamma * target_Q
 
         # Optimize Critic
-        current_Q = self.critic(states, actions)
+        current_Q = self.critic(states, torch.tensor(actions,device=self.device))
         critic_loss = F.mse_loss(current_Q, target_Q)
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
