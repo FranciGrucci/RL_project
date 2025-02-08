@@ -314,7 +314,7 @@ import argparse
 import numpy as np
 import torch
 import gymnasium as gym
-from prova import DDPG_Agent 
+from ddpg_agent import DDPG_Agent 
 
 def evaluate(n_episodes=10, render=False):
     """
