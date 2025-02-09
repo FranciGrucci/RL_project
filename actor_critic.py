@@ -34,6 +34,21 @@ class Actor(nn.Module):
         if not os.path.exists(ckpt_dir):
             pathlib.Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
 
+    #inizializzazione dei pesi:
+
+    def init_weights(self):
+        f1 = 1 / np.sqrt(self.fc1.weight.data.size()[0])
+        torch.nn.init.uniform_(self.fc1.weight.data, -f1, f1)
+        torch.nn.init.uniform_(self.fc1.bias.data, -f1, f1)
+        
+        f2 = 1 / np.sqrt(self.fc2.weight.data.size()[0])
+        torch.nn.init.uniform_(self.fc2.weight.data, -f2, f2)
+        torch.nn.init.uniform_(self.fc2.bias.data, -f2, f2)
+        
+        f3 = 1 / np.sqrt(self.fc3.weight.data.size()[0])
+        torch.nn.init.uniform_(self.fc3.weight.data, -f3, f3)
+        torch.nn.init.uniform_(self.fc3.bias.data, -f3, f3)
+
     def forward(self, state):
         state = state.to(self.device)
         x = F.relu(self.bn1(self.fc1(state)))
@@ -71,6 +86,28 @@ class Critic(nn.Module):
         
         self.to(self.device)
 
+
+    #inizializzazione dei pesi:
+
+    # Inizializzazione dei pesi
+    def init_weights(self):
+         f1 = 1 /np.sqrt(self.fc1.weight.data.size()[0])
+         torch.nn.init.uniform_(self.fc1.weight.data, -f1, f1)
+         torch.nn.init.uniform_(self.fc1.bias.data, -f1, f1)
+
+         
+         f2 = 1 /np.sqrt(self.fc2.weight.data.size()[0])
+         torch.nn.init.uniform_(self.fc2.weight.data, -f2, f2)
+         torch.nn.init.uniform_(self.fc2.bias.data, -f2, f2)
+        
+         f_action = 1 /np.sqrt(self.action_value.weight.data.size()[0])
+         torch.nn.init.uniform_(self.action_value.weight.data, -f_action, f_action)
+         torch.nn.init.uniform_(self.action_value.bias.data, -f_action, f_action)
+         f_q = 1 /np.sqrt(self.q.weight.data.size()[0])
+         torch.nn.init.uniform_(self.q.weight.data, -f_q, f_q)
+         torch.nn.init.uniform_(self.q.bias.data, -f_q, f_q)
+         
+        
 
     # def forward(self, state, action):
     #     state_value = F.relu(self.bn1(self.fc1(state)))
