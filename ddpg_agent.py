@@ -59,7 +59,7 @@ class DDPG_Agent:
         if self.replay_buffer.size() < batch_size:
             return
 
-        states, actions, rewards, next_states, dones = self.replay_buffer.sample_batch(batch_size)
+        states, actions, rewards, dones, next_states = self.replay_buffer.sample_batch(batch_size)
 
         # Compute target Q-value
         with torch.no_grad():
