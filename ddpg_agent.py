@@ -11,12 +11,17 @@ import numpy as np
 # ---- DDPG AGENT ----
 class DDPG_Agent:
     def __init__(self, state_dim, action_dim, max_action, gamma=0.99, tau=0.005, lr=0.001):
-        self.actor = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor", ckpt_dir="ckpt")
-        self.actor_target = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor_target", ckpt_dir="ckpt")
+        #self.actor = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor", ckpt_dir="ckpt")
+        self.actor = Actor(action_dim)
+
+        #self.actor_target = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor_target", ckpt_dir="ckpt")
+        self.actor_target = Actor(action_dim)
         self.actor_target.load_state_dict(self.actor.state_dict())
 
-        self.critic = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic", ckpt_dir="ckpt")
-        self.critic_target = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic_target", ckpt_dir="ckpt")
+        #self.critic = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic", ckpt_dir="ckpt")
+        self.critic = Critic(action_dim)
+        #self.critic_target = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic_target", ckpt_dir="ckpt")
+        self.critic_target = Critic(action_dim)
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr)
