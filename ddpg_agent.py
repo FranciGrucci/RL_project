@@ -7,6 +7,7 @@ from replay_buffer import ReplayBuffer
 import numpy as np
 import time
 from tqdm import tqdm
+
 # ---- DDPG AGENT ----
 class DDPG_Agent:
     def __init__(self, state_dim, action_dim, max_action, env, gamma=0.99, tau=0.005, lr=0.001):
@@ -82,9 +83,10 @@ class DDPG_Agent:
         return s_0
 
     def take_step(self, mode='exploit'):
-        # choose action with epsilon greedy
+        
         if mode == 'explore':
             action = self.env.action_space.sample()
+            
 
         else:
             
@@ -106,8 +108,6 @@ class DDPG_Agent:
 
         self.s_0 = s_1.detach().clone()
 
-        # self.step_count += 1
-
         if done:
             self.s_0, _ = self.env.reset()
             self.s_0 = self.handle_state_shape(self.s_0, self.device)
@@ -125,7 +125,7 @@ class DDPG_Agent:
 
         print("\nStart training...")
 
-        for episode in tqdm(range(n_episodes)):
+        for episode in range(n_episodes):
             self.s_0, _ = self.env.reset()
             self.s_0 = self.handle_state_shape(self.s_0, self.device)
             self.rewards = 0
@@ -140,12 +140,8 @@ class DDPG_Agent:
                 with torch.no_grad():
                     next_actions = self.actor_target(next_states)
                     target_Q = self.critic_target(next_states, next_actions)
-                    #print(target_Q.shape)
-                    #time.sleep(5)
-                    # print(type(target_Q))
-                    # print("ELLE",(rewards.get_device(), dones.get_device(),target_Q.get_device()))
-                    target_Q = rewards.to(
-                        self.device) + (1 - dones.to(self.device)) * self.gamma * target_Q
+                    target_Q = rewards + (1 - dones) * self.gamma * target_Q
+                    
 
                 # Optimize Critic
                 current_Q = self.critic(
@@ -172,8 +168,12 @@ class DDPG_Agent:
                         self.tau * param.data + (1 - self.tau) * target_param.data)
 
                 if done:
+                    if(episode % 5 == 0): ##Save checkpoint
+                        print("Saving...")
+                        self.save()
                     print(
                         f"Episodio {episode + 1}/{n_episodes}, Reward: {self.rewards}")
+                    
         self.save()
         self.env.close()
     
@@ -182,29 +182,19 @@ class DDPG_Agent:
         """
         Valuta un agente addestrato sull'ambiente CarRacing-v2.
         """
-        #agent = DDPG_Agent()
         self.load()
-
-        
-        #rewards = []
-
     
         total_reward = 0
         done = False
         state, _ = env.reset()
-        #state = np.array(state, dtype=np.float32).flatten()
         state = self.handle_state_shape(state,self.device)
+
         while not done:
             action = self.select_action(state, noise=0.0)
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             total_reward += reward
             state = self.handle_state_shape(next_state,self.device)
-            #state = np.array(next_state, dtype=np.float32).flatten()
 
-        #rewards.append(total_reward)
         print(f" Reward = {total_reward}")
-
-        
-    
         env.close()
