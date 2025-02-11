@@ -5,9 +5,9 @@ from collections import deque
 import time
 # ---- REPLAY BUFFER ----
 class ReplayBuffer:
-    def __init__(self, device,max_size=500):
+    def __init__(self, device,max_size=50000):
         self.buffer = deque(maxlen=max_size)
-        self.burn_in = 100
+        self.burn_in = 10000
         self.device = device
 
     def push(self, state, action, reward, done,next_state):

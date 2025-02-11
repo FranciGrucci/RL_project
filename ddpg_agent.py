@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from replay_buffer import ReplayBuffer
 import numpy as np
 import time
-
+from tqdm import tqdm
 # ---- DDPG AGENT ----
 class DDPG_Agent:
     def __init__(self, state_dim, action_dim, max_action, env, gamma=0.99, tau=0.005, lr=0.001):
@@ -113,7 +113,7 @@ class DDPG_Agent:
             self.s_0 = self.handle_state_shape(self.s_0, self.device)
         return done
 
-    def train(self, batch_size=64, n_episodes=10):
+    def train(self, batch_size=32, n_episodes=10):
         self.s_0, _ = self.env.reset()
         self.s_0 = self.handle_state_shape(self.s_0, self.device)
         print("Populating buffer")
@@ -125,7 +125,7 @@ class DDPG_Agent:
 
         print("\nStart training...")
 
-        for episode in range(n_episodes):
+        for episode in tqdm(range(n_episodes)):
             self.s_0, _ = self.env.reset()
             self.s_0 = self.handle_state_shape(self.s_0, self.device)
             self.rewards = 0
@@ -176,3 +176,35 @@ class DDPG_Agent:
                         f"Episodio {episode + 1}/{n_episodes}, Reward: {self.rewards}")
         self.save()
         self.env.close()
+    
+    def evaluate(self,env):
+        
+        """
+        Valuta un agente addestrato sull'ambiente CarRacing-v2.
+        """
+        #agent = DDPG_Agent()
+        self.load()
+
+        
+        #rewards = []
+
+    
+        total_reward = 0
+        done = False
+        state, _ = env.reset()
+        #state = np.array(state, dtype=np.float32).flatten()
+        state = self.handle_state_shape(state,self.device)
+        while not done:
+            action = self.select_action(state, noise=0.0)
+            next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            total_reward += reward
+            state = self.handle_state_shape(next_state,self.device)
+            #state = np.array(next_state, dtype=np.float32).flatten()
+
+        #rewards.append(total_reward)
+        print(f" Reward = {total_reward}")
+
+        
+    
+        env.close()
