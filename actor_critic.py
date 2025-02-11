@@ -11,32 +11,50 @@ import pathlib
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import time
+class SimpleCNN(nn.Module):
+    def __init__(self, num_classes=10): 
+        super(SimpleCNN, self).__init__()
+        # Primo blocco convoluzionale
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=1, padding=1)  # output: 16 x 84 x 96
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)  # output: 16 x 42 x 48
 
-class CNNFeatureExtractor(nn.Module):
-    def __init__(self):
-        super(CNNFeatureExtractor, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=8, stride=4, padding=2)  # (96 -> 24)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1)  # (24 -> 12)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)  # (12 -> 12)
-        self.fc = nn.Linear(64 * 12 * 12, 512)
-    
+        # Secondo blocco convoluzionale
+        self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)  # output: 32 x 42 x 48
+        # Dopo MaxPooling: output: 32 x 21 x 24
+
+        # Terzo blocco convoluzionale
+        self.conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)  # output: 64 x 21 x 24
+        # Dopo MaxPooling: output: 64 x 10 x 12
+
+        # Fully connected layer
+        self.fc1 = nn.Linear(in_features=64 * 10 * 12, out_features=128)  # Primo livello fully connected
+        self.fc2 = nn.Linear(in_features=128, out_features=512)  # Output finale
+
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = x.view(x.size(0), -1)  # Flatten
-        x = F.relu(self.fc(x))
+        # Passaggio nei layer convoluzionali con ReLU e MaxPooling
+        x = self.pool(F.relu(self.conv1(x)))  # Conv1 -> ReLU -> MaxPool
+        x = self.pool(F.relu(self.conv2(x)))  # Conv2 -> ReLU -> MaxPool
+        x = self.pool(F.relu(self.conv3(x)))  # Conv3 -> ReLU -> MaxPool
+        
+        # Flatten per il passaggio al fully connected
+        x = x.view(-1, 64 * 10 * 12)  # Flatten (batch_size, features)
+        
+        # Passaggio nei layer fully connected
+        x = F.relu(self.fc1(x))  # Primo fully connected con ReLU
+        x = self.fc2(x)  # Output finale
         return x
 
 class Actor(nn.Module):
     def __init__(self, action_dim):
         super(Actor, self).__init__()
-        self.cnn = CNNFeatureExtractor()
+        self.cnn = SimpleCNN()
         self.fc1 = nn.Linear(512, 256)
         self.fc2 = nn.Linear(256, action_dim)
     
     def forward(self, state):
-        state = state.view(-1, 3, 96, 96)  # Reshape corretto
+        #state = state.view(-1, 3, 96, 96)  # Reshape corretto
+        
         x = self.cnn(state)
         x = F.relu(self.fc1(x))
         action = torch.tanh(self.fc2(x))  # Output in [-1,1]
@@ -45,13 +63,14 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     def __init__(self, action_dim):
         super(Critic, self).__init__()
-        self.cnn = CNNFeatureExtractor()
+        self.cnn = SimpleCNN()
         self.fc1 = nn.Linear(512 + action_dim, 256)  # Concat feature + action
         self.fc2 = nn.Linear(256, 1)
     
     def forward(self, state, action):
-        state = state.view(-1, 3, 96, 96)  # Reshape corretto
+        #state = state.view(-1, 3, 96, 96)  # Reshape corretto
         x = self.cnn(state)
+        #print("ACTION",action.shape)
         x = torch.cat([x, action], dim=-1)  # Concat features & action
         x = F.relu(self.fc1(x))
         value = self.fc2(x)
