@@ -9,6 +9,8 @@ import time
 from tqdm import tqdm
 
 # ---- DDPG AGENT ----
+
+
 class DDPG_Agent:
     def __init__(self, state_dim, action_dim, max_action, env, gamma=0.99, tau=0.005, lr=0.001):
         # self.actor = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor", ckpt_dir="ckpt")
@@ -18,25 +20,27 @@ class DDPG_Agent:
 
         # self.actor_target = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor_target", ckpt_dir="ckpt")
         self.actor_target = Actor(action_dim).to(self.device)
+        self.actor_target.eval()
         self.actor_target.load_state_dict(self.actor.state_dict())
 
         # self.critic = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic", ckpt_dir="ckpt")
         self.critic = Critic(action_dim).to(self.device)
         # self.critic_target = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic_target", ckpt_dir="ckpt")
         self.critic_target = Critic(action_dim).to(self.device)
+        self.critic_target.eval()
+
         self.critic_target.load_state_dict(self.critic.state_dict())
 
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr)
+        self.actor_optimizer = optim.AdamW(self.actor.parameters(), lr=lr)
+        self.critic_optimizer = optim.AdamW(self.critic.parameters(), lr=lr)
 
         self.replay_buffer = ReplayBuffer(device=self.device)
         self.gamma = gamma
         self.tau = tau
         self.max_action = max_action
-        
+
         self.env = env
         self.rewards = 0
-
 
     def save(self, filename="ddpg_checkpoint.pth"):
         """Salva i parametri delle reti dell'agente."""
@@ -60,19 +64,24 @@ class DDPG_Agent:
             checkpoint["critic_optimizer_state_dict"])
         print(f"Modello caricato da {filename}")
 
-
     def select_action(self, state, noise=0.1):
-        
-        action = self.actor(state).detach().cpu().numpy()[0]
-        action = action + np.random.normal(0, noise, size=action.shape)  # Esplorazione
-        return np.clip(action, -self.max_action, self.max_action)  # Limita le azioni
+        self.actor.eval()
+        with torch.no_grad():
+            if state.dim() == 3:  # Add batch dimension if state is a single image
+                state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
+            action = self.actor(state).detach().cpu().numpy()[0]
+            action = action + \
+                np.random.normal(0, noise, size=action.shape)  # Esplorazione
+            # Limita le azioni
+        self.actor.train()
 
+        return np.clip(action, -self.max_action, self.max_action)
 
     def handle_state_shape(self, s_0, device):
         if s_0.shape == torch.Size([3, 84, 96]):  # Ensures no further crops
             return s_0
 
-        s_0 = torch.FloatTensor(s_0)
+        s_0 = torch.FloatTensor(s_0).detach()
 
         # Permute to change the order of dimensions
         # From (84, 3, 96) to (3, 96, 84)
@@ -83,18 +92,16 @@ class DDPG_Agent:
         return s_0
 
     def take_step(self, mode='exploit'):
-        
+
         if mode == 'explore':
             action = self.env.action_space.sample()
-            
 
         else:
-            
+
             # Assuming self.s_0 has shape 1x84x3x96
             self.s_0 = self.handle_state_shape(self.s_0, self.device)
 
             action = self.select_action(self.s_0, noise=0.1)
-      
 
         s_1, r, terminated, truncated, _ = self.env.step(action)
         s_1 = self.handle_state_shape(s_1, self.device)
@@ -106,7 +113,7 @@ class DDPG_Agent:
 
         self.rewards += r
 
-        self.s_0 = s_1.detach().clone()
+        self.s_0 = s_1.clone()
 
         if done:
             self.s_0, _ = self.env.reset()
@@ -114,12 +121,15 @@ class DDPG_Agent:
         return done
 
     def train(self, batch_size=32, n_episodes=10):
+        self.actor.train()
+        self.critic.train()
+        
         self.s_0, _ = self.env.reset()
         self.s_0 = self.handle_state_shape(self.s_0, self.device)
         print("Populating buffer")
         # Populate replay buffer
         while self.replay_buffer.burn_in_capacity() < 1:
-            print("\rFull {:2f}%\t\t".format(
+            print("\rFull {:.2f}%\t\t".format(
                 self.replay_buffer.burn_in_capacity()*100), end="")
             self.take_step(mode='explore')
 
@@ -138,23 +148,25 @@ class DDPG_Agent:
 
                 # Compute target Q-value
                 with torch.no_grad():
+
                     next_actions = self.actor_target(next_states)
                     target_Q = self.critic_target(next_states, next_actions)
                     target_Q = rewards + (1 - dones) * self.gamma * target_Q
-                    
+                
+                self.critic_optimizer.zero_grad()
 
                 # Optimize Critic
                 current_Q = self.critic(
                     states, actions)
-                
+
                 critic_loss = F.mse_loss(current_Q, target_Q)
-                self.critic_optimizer.zero_grad()
                 critic_loss.backward()
                 self.critic_optimizer.step()
 
+                self.actor_optimizer.zero_grad()
+
                 # Optimize Actor (maximize Q-value)
                 actor_loss = -self.critic(states, self.actor(states)).mean()
-                self.actor_optimizer.zero_grad()
                 actor_loss.backward()
                 self.actor_optimizer.step()
 
@@ -168,33 +180,34 @@ class DDPG_Agent:
                         self.tau * param.data + (1 - self.tau) * target_param.data)
 
                 if done:
-                    if(episode % 5 == 0): ##Save checkpoint
+                    if (episode % 5 == 0):  # Save checkpoint
                         print("Saving...")
                         self.save()
                     print(
                         f"Episodio {episode + 1}/{n_episodes}, Reward: {self.rewards}")
-                    
+
         self.save()
         self.env.close()
-    
-    def evaluate(self,env):
-        
+
+    def evaluate(self, env):
         """
         Valuta un agente addestrato sull'ambiente CarRacing-v2.
         """
         self.load()
-    
+
         total_reward = 0
         done = False
         state, _ = env.reset()
-        state = self.handle_state_shape(state,self.device)
-
-        while not done:
-            action = self.select_action(state, noise=0.0)
-            next_state, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
-            total_reward += reward
-            state = self.handle_state_shape(next_state,self.device)
+        state = self.handle_state_shape(state, self.device)
+        self.actor.eval()
+        self.critic.eval()
+        with torch.no_grad():
+            while not done:
+                action = self.select_action(state, noise=0.0)
+                next_state, reward, terminated, truncated, _ = env.step(action)
+                done = terminated or truncated
+                total_reward += reward
+                state = self.handle_state_shape(next_state, self.device)
 
         print(f" Reward = {total_reward}")
         env.close()
