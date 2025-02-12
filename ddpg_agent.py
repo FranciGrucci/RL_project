@@ -20,14 +20,14 @@ class DDPG_Agent:
 
         # self.actor_target = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor_target", ckpt_dir="ckpt")
         self.actor_target = Actor(action_dim).to(self.device)
-        self.actor_target.eval()
+        #self.actor_target.eval()
         self.actor_target.load_state_dict(self.actor.state_dict())
 
         # self.critic = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic", ckpt_dir="ckpt")
         self.critic = Critic(action_dim).to(self.device)
         # self.critic_target = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic_target", ckpt_dir="ckpt")
         self.critic_target = Critic(action_dim).to(self.device)
-        self.critic_target.eval()
+        #self.critic_target.eval()
 
         self.critic_target.load_state_dict(self.critic.state_dict())
 
@@ -38,7 +38,7 @@ class DDPG_Agent:
         self.gamma = gamma
         self.tau = tau
         self.max_action = max_action
-
+        self.noise = 0.1
         self.env = env
         self.rewards = 0
 
@@ -63,7 +63,10 @@ class DDPG_Agent:
         self.critic_optimizer.load_state_dict(
             checkpoint["critic_optimizer_state_dict"])
         print(f"Modello caricato da {filename}")
-
+    
+    def exponential_annealing_schedule(self,n, rate):
+        return 1 - (1-0.4)*np.exp(-rate * n)
+    
     def select_action(self, state, noise=0.1):
         self.actor.eval()
         with torch.no_grad():
@@ -74,8 +77,8 @@ class DDPG_Agent:
                 np.random.normal(0, noise, size=action.shape)  # Esplorazione
             # Limita le azioni
         self.actor.train()
-
-        return np.clip(action, -self.max_action, self.max_action)
+        
+        return np.clip(action, [-1.0, 0.0, 0.0], [1.0, 1.0, 1.0])
 
     def handle_state_shape(self, s_0, device):
         if s_0.shape == torch.Size([3, 84, 96]):  # Ensures no further crops
@@ -101,7 +104,7 @@ class DDPG_Agent:
             # Assuming self.s_0 has shape 1x84x3x96
             self.s_0 = self.handle_state_shape(self.s_0, self.device)
 
-            action = self.select_action(self.s_0, noise=0.1)
+            action = self.select_action(self.s_0, noise=self.noise)
 
         s_1, r, terminated, truncated, _ = self.env.step(action)
         s_1 = self.handle_state_shape(s_1, self.device)
@@ -180,9 +183,11 @@ class DDPG_Agent:
                         self.tau * param.data + (1 - self.tau) * target_param.data)
 
                 if done:
-                    if (episode % 5 == 0):  # Save checkpoint
+                    if (episode % 20 == 0):  # Save checkpoint
                         print("Saving...")
                         self.save()
+                        self.noise = self.exponential_annealing_schedule(episode,1e-2)
+
                     print(
                         f"Episodio {episode + 1}/{n_episodes}, Reward: {self.rewards}")
 

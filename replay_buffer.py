@@ -23,8 +23,8 @@ class ReplayBuffer:
         states, actions, rewards, dones, next_states = zip(*batch)
 
         rewards = torch.FloatTensor(rewards).reshape(-1, 1).to(self.device)
-        actions = torch.LongTensor(np.array(actions)).to(self.device)
-        dones = torch.IntTensor(dones).reshape(-1, 1).to(self.device)
+        actions = torch.FloatTensor(np.array(actions)).to(self.device)
+        dones = torch.FloatTensor(dones).reshape(-1, 1).to(self.device)
         states = torch.stack(states).to(self.device)
         next_states = torch.stack(next_states).to(self.device)
 

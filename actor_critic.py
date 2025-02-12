@@ -53,8 +53,12 @@ class Actor(nn.Module):
 
         x = self.cnn(state)
         x = F.relu(self.fc1(x))
-        action = torch.tanh(self.fc2(x))  # Output in [-1,1]
-        return action
+        #action = torch.tanh(self.fc2(x))  # Output in [-1,1]
+        steering = torch.tanh(self.fc2(x)[:, 0])  # [-1, 1]
+        acceleration = torch.sigmoid(self.fc2(x)[:, 1])  # [0, 1]
+        brake = torch.sigmoid(self.fc2(x)[:, 2])  # [0, 1]
+        return torch.stack([steering, acceleration, brake], dim=-1)
+       
 
 
 class Critic(nn.Module):

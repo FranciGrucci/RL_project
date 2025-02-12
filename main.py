@@ -21,7 +21,7 @@ def main():
             env.observation_space.shape[1] * env.observation_space.shape[2]
         action_dim = env.action_space.shape[0]
         max_action = float(env.action_space.high[0])
-
+        
         agent = DDPG_Agent(state_dim, action_dim, max_action, env=env)
 
         agent.train(n_episodes=args.n_episodes,batch_size=64)
