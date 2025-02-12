@@ -40,7 +40,13 @@ class DDPG_Agent:
         self.max_action = max_action
         self.noise = 0.1
         self.env = env
+        
         self.rewards = 0
+        self.reward_threshold = 300
+        self.training_rewards = []
+        self.mean_training_rewards = []
+        self.window = 50
+
 
     def save(self, filename="ddpg_checkpoint.pth"):
         """Salva i parametri delle reti dell'agente."""
@@ -191,14 +197,34 @@ class DDPG_Agent:
                         self.tau * param.data + (1 - self.tau) * target_param.data)
 
                 if done:
-                    self.noise = self.exponential_annealing_schedule(episode,1e-2,start_value=self.noise)
-
+                    if (episode % 10 == 0):  # Save checkpoint
+                        self.noise = self.exponential_annealing_schedule(episode,1e-2,start_value=self.noise)
+                        if self.noise <= 0.0001:
+                            self.noise = 0.0001
                     if (episode % 20 == 0):  # Save checkpoint
                         print("Saving...")
                         self.save()
+                    if self.rewards > 2000:
+                        self.training_rewards.append(2000)
+                    elif self.rewards > 1000:
+                        self.training_rewards.append(1000)
+                    elif self.rewards > 500:
+                        self.training_rewards.append(500)
+                    else:
+                        self.training_rewards.append(self.rewards)
+                    
+                    mean_rewards = np.mean(self.training_rewards[-self.window:])
+                    self.mean_training_rewards.append(mean_rewards)
 
                     print(
-                        f"Episodio {episode + 1}/{n_episodes}, Reward: {self.rewards}, Noise: {self.noise}")
+                        "\rEpisode {:d} Mean Rewards {:.2f}  Episode reward = {:.2f} \t\t".format(
+                            episode, mean_rewards, self.rewards), end="")
+                    
+                    if mean_rewards >= self.reward_threshold:
+                        #training = False
+                        print('\nEnvironment solved in {} episodes!'.format(
+                            episode))
+                        self.save(filename="solved.pth")
                     if self.rewards>0:
                         print("AH")
 
