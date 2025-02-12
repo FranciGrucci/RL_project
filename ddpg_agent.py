@@ -7,6 +7,7 @@ from replay_buffer import ReplayBuffer
 import numpy as np
 import time
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # ---- DDPG AGENT ----
 
@@ -42,10 +43,21 @@ class DDPG_Agent:
         self.env = env
         
         self.rewards = 0
+        self.update_loss = []
         self.reward_threshold = 300
         self.training_rewards = []
         self.mean_training_rewards = []
+        self.actor_loss = []
+        self.critic_loss = []
         self.window = 50
+        self.step_count = 0
+        
+
+        
+
+       
+        
+        
 
 
     def save(self, filename="ddpg_checkpoint.pth"):
@@ -162,6 +174,7 @@ class DDPG_Agent:
 
                 states, actions, rewards, dones, next_states = self.replay_buffer.sample_batch(
                     batch_size)
+                
 
                 # Compute target Q-value
                 with torch.no_grad():
@@ -186,6 +199,15 @@ class DDPG_Agent:
                 actor_loss = -self.critic(states, self.actor(states)).mean()
                 actor_loss.backward()
                 self.actor_optimizer.step()
+
+                
+                
+
+                    
+
+                
+
+
 
                 # Soft update delle reti target
                 for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
@@ -212,9 +234,14 @@ class DDPG_Agent:
                         self.training_rewards.append(500)
                     else:
                         self.training_rewards.append(self.rewards)
-                    
+                    self.update_loss = []
                     mean_rewards = np.mean(self.training_rewards[-self.window:])
+                    #mean_loss = np.mean(self.training_loss[-self.window:])
+                    self.actor_loss.append(actor_loss.detach().cpu().item())   # Save loss
+                    self.critic_loss.append(critic_loss.detach().cpu().item())
                     self.mean_training_rewards.append(mean_rewards)
+                    
+                    
 
                     print(
                         "\rEpisode {:d} Mean Rewards {:.2f}  Episode reward = {:.2f} \t\t".format(
@@ -227,6 +254,12 @@ class DDPG_Agent:
                         self.save(filename="solved.pth")
                     if self.rewards>0:
                         print("AH")
+
+                    
+        self.plot_training_results()
+        self.plot_actor_loss()
+        self.plot_critic_loss()
+
 
         self.save()
         self.env.close()
@@ -256,3 +289,39 @@ class DDPG_Agent:
 
         print(f" Reward = {total_reward}")
         env.close()
+
+    def plot_training_results(self):
+        plt.figure(figsize=(18, 5))
+
+        # Plot dei reward medi
+        plt.subplot(1, 3, 1)
+        plt.plot(self.mean_training_rewards)
+        plt.title("Mean Training Rewards")
+        plt.xlabel("Episodes")
+        plt.ylabel("Reward")
+       
+
+        # Plot delle loss
+  
+        plt.subplot(1, 3, 2)
+        plt.plot(self.actor_loss, label="Actor Loss")
+        
+        plt.title("Actor Loss During Training")
+        plt.xlabel("Training Steps")
+        plt.ylabel("Loss")
+        plt.legend()
+
+    
+        plt.subplot(1, 3, 3)
+        
+        plt.plot(self.critic_loss, label="Critic Loss")
+        plt.title("Critic Loss During Training")
+        plt.xlabel("Training Steps")
+        plt.ylabel("Loss")
+        plt.legend()
+
+        plt.tight_layout()
+        plt.savefig('mean_training_rewards.png')
+        
+
+        plt.show()
