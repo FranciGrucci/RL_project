@@ -24,7 +24,7 @@ def main():
         
         agent = DDPG_Agent(state_dim, action_dim, max_action, env=env)
 
-        agent.train(n_episodes=args.n_episodes,batch_size=64)
+        agent.train(n_episodes=args.n_episodes,batch_size=128)
 
     if args.evaluate:
         env = gym.make("CarRacing-v2", continuous=True,

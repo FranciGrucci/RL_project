@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from replay_buffer import ReplayBuffer
 import numpy as np
 import time
+from ornsteinuhlebeck import OrnsteinUhlenbeckNoise
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
@@ -39,9 +40,9 @@ class DDPG_Agent:
         self.gamma = gamma
         self.tau = tau
         self.max_action = max_action
-        self.noise = 0.1
+        self.noise = 0.1 #OrnsteinUhlenbeckNoise(action_dim=3)
         self.env = env
-        
+        self.max_mean_reward = 0
         self.rewards = 0
         self.update_loss = []
         self.reward_threshold = 300
@@ -49,17 +50,9 @@ class DDPG_Agent:
         self.mean_training_rewards = []
         self.actor_loss = []
         self.critic_loss = []
-        self.window = 50
+        self.window = 10
         self.step_count = 0
         
-
-        
-
-       
-        
-        
-
-
     def save(self, filename="ddpg_checkpoint.pth"):
         """Salva i parametri delle reti dell'agente."""
         checkpoint = {
@@ -85,14 +78,14 @@ class DDPG_Agent:
     def exponential_annealing_schedule(self,n, rate,start_value):
             return start_value * np.exp(-rate * n)
 
-    def select_action(self, state, noise=0.1):
+    def select_action(self, state, noise=0.1,eval=False):
         self.actor.eval()
         with torch.no_grad():
             if state.dim() == 3:  # Add batch dimension if state is a single image
                 state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
             action = self.actor(state).detach().cpu().numpy()[0]
-            action = action + \
-                np.random.normal(0, noise, size=action.shape)  # Esplorazione
+            if not eval:
+                action = action + np.random.normal(0, noise, size=action.shape)# self.noise.noise()   # Esplorazione
             # Limita le azioni
         self.actor.train()
         
@@ -137,6 +130,7 @@ class DDPG_Agent:
         self.s_0 = s_1.clone()
 
         if done:
+            #self.noise.reset()
             self.s_0, _ = self.env.reset()
             self.s_0 = self.handle_state_shape(self.s_0, self.device)
         return done
@@ -144,7 +138,7 @@ class DDPG_Agent:
     def train(self, batch_size=32, n_episodes=10):
         self.actor.train()
         self.critic.train()
-        
+        #self.noise.reset()
         state, _ = self.env.reset()
         for i in range(50):
             state,_,_,_,_ = self.env.step([0,0,0])
@@ -200,15 +194,6 @@ class DDPG_Agent:
                 actor_loss.backward()
                 self.actor_optimizer.step()
 
-                
-                
-
-                    
-
-                
-
-
-
                 # Soft update delle reti target
                 for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
                     target_param.data.copy_(
@@ -225,22 +210,25 @@ class DDPG_Agent:
                             self.noise = 0.0001
                     if (episode % 20 == 0):  # Save checkpoint
                         print("Saving...")
-                        self.save()
-                    if self.rewards > 2000:
-                        self.training_rewards.append(2000)
-                    elif self.rewards > 1000:
-                        self.training_rewards.append(1000)
-                    elif self.rewards > 500:
-                        self.training_rewards.append(500)
-                    else:
-                        self.training_rewards.append(self.rewards)
+                        self.save(filename="checkpoint.pth")
+                    # if self.rewards > 2000:
+                    #     self.training_rewards.append(2000)
+                    # elif self.rewards > 1000:
+                    #     self.training_rewards.append(1000)
+                    # elif self.rewards > 500:
+                    #     self.training_rewards.append(500)
+                    # else:
+                    self.training_rewards.append(self.rewards)
                     self.update_loss = []
                     mean_rewards = np.mean(self.training_rewards[-self.window:])
                     #mean_loss = np.mean(self.training_loss[-self.window:])
                     self.actor_loss.append(actor_loss.detach().cpu().item())   # Save loss
                     self.critic_loss.append(critic_loss.detach().cpu().item())
                     self.mean_training_rewards.append(mean_rewards)
-                    
+                    if mean_rewards>self.max_mean_reward:
+                        print("Saving...")
+                        self.save(filename="best.pth")
+                        self.max_mean_reward = mean_rewards
                     
 
                     print(
@@ -253,22 +241,22 @@ class DDPG_Agent:
                             episode))
                         self.save(filename="solved.pth")
                     if self.rewards>0:
-                        print("AH")
+                        print("<-----------")
 
                     
         self.plot_training_results()
-        self.plot_actor_loss()
-        self.plot_critic_loss()
+        #self.plot_actor_loss()
+        #self.plot_critic_loss()
 
 
-        self.save()
+        self.save(filename="final_ckeckpoint.pth")
         self.env.close()
 
     def evaluate(self, env):
         """
         Valuta un agente addestrato sull'ambiente CarRacing-v2.
         """
-        self.load()
+        self.load(filename="best.pth")
 
         total_reward = 0
         done = False
@@ -281,7 +269,7 @@ class DDPG_Agent:
         state = self.handle_state_shape(state, self.device)
         with torch.no_grad():
             while not done:
-                action = self.select_action(state, noise=0.0)
+                action = self.select_action(state, noise=0.0,eval=True)
                 next_state, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
                 total_reward += reward
