@@ -64,9 +64,9 @@ class DDPG_Agent:
             checkpoint["critic_optimizer_state_dict"])
         print(f"Modello caricato da {filename}")
     
-    def exponential_annealing_schedule(self,n, rate):
-        return 1 - (1-0.4)*np.exp(-rate * n)
-    
+    def exponential_annealing_schedule(self,n, rate,start_value):
+            return start_value * np.exp(-rate * n)
+
     def select_action(self, state, noise=0.1):
         self.actor.eval()
         with torch.no_grad():
@@ -127,20 +127,28 @@ class DDPG_Agent:
         self.actor.train()
         self.critic.train()
         
-        self.s_0, _ = self.env.reset()
-        self.s_0 = self.handle_state_shape(self.s_0, self.device)
+        state, _ = self.env.reset()
+        for i in range(50):
+            state,_,_,_,_ = self.env.step([0,0,0])
+        self.s_0 = self.handle_state_shape(state, self.device)
         print("Populating buffer")
         # Populate replay buffer
         while self.replay_buffer.burn_in_capacity() < 1:
             print("\rFull {:.2f}%\t\t".format(
                 self.replay_buffer.burn_in_capacity()*100), end="")
-            self.take_step(mode='explore')
+            done = self.take_step(mode='explore')
+            if done:
+                for i in range(50):
+                    state,_,_,_,_ = self.env.step([0,0,0])
+                self.s_0 = self.handle_state_shape(state, self.device)
 
         print("\nStart training...")
 
         for episode in range(n_episodes):
-            self.s_0, _ = self.env.reset()
-            self.s_0 = self.handle_state_shape(self.s_0, self.device)
+            state, _ = self.env.reset()
+            for i in range(50):
+                state,_,_,_,_ = self.env.step([0,0,0])
+            self.s_0 = self.handle_state_shape(state, self.device)
             self.rewards = 0
             done = False
             while not done:
@@ -183,13 +191,16 @@ class DDPG_Agent:
                         self.tau * param.data + (1 - self.tau) * target_param.data)
 
                 if done:
+                    self.noise = self.exponential_annealing_schedule(episode,1e-2,start_value=self.noise)
+
                     if (episode % 20 == 0):  # Save checkpoint
                         print("Saving...")
                         self.save()
-                        self.noise = self.exponential_annealing_schedule(episode,1e-2)
 
                     print(
-                        f"Episodio {episode + 1}/{n_episodes}, Reward: {self.rewards}")
+                        f"Episodio {episode + 1}/{n_episodes}, Reward: {self.rewards}, Noise: {self.noise}")
+                    if self.rewards>0:
+                        print("AH")
 
         self.save()
         self.env.close()
@@ -203,9 +214,12 @@ class DDPG_Agent:
         total_reward = 0
         done = False
         state, _ = env.reset()
-        state = self.handle_state_shape(state, self.device)
+        #state = self.handle_state_shape(state, self.device)
         self.actor.eval()
         self.critic.eval()
+        for i in range(50):
+            state,_,_,_,_ = env.step([0,0,0])
+        state = self.handle_state_shape(state, self.device)
         with torch.no_grad():
             while not done:
                 action = self.select_action(state, noise=0.0)
