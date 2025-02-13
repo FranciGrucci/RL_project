@@ -44,7 +44,7 @@ class DDPG_Agent:
         self.max_mean_reward = 0
         self.rewards = 0
         self.update_loss = []
-        self.reward_threshold = 300
+        self.reward_threshold = 1000
         self.training_rewards = []
         self.mean_training_rewards = []
         self.actor_loss = []
@@ -158,7 +158,7 @@ class DDPG_Agent:
             #     #self.s_0 = self.handle_state_shape(state, self.device)
             #     self.s_0 = torch.FloatTensor(self.s_0).detach().to(self.device)
         print("\nStart training...")
-
+        train = True
         for episode in range(n_episodes):
             state, _ = self.env.reset()
             # for i in range(50):
@@ -234,6 +234,7 @@ class DDPG_Agent:
                         print("Saving...")
                         self.save(filename="best.pth")
                         self.max_mean_reward = mean_rewards
+
                     
 
                     print(
@@ -245,11 +246,13 @@ class DDPG_Agent:
                         print('\nEnvironment solved in {} episodes!'.format(
                             episode))
                         self.save(filename="solved.pth")
-                    if self.rewards>0:
-                        print("<-----------")
-
+                        self.plot_training_results(filename="solved")
+                        train = False
                     
-        self.plot_training_results()
+            if not train:
+                break
+        if train:            
+            self.plot_training_results()
         #self.plot_actor_loss()
         #self.plot_critic_loss()
 
@@ -261,7 +264,7 @@ class DDPG_Agent:
         """
         Valuta un agente addestrato sull'ambiente CarRacing-v2.
         """
-        self.load(filename="best.pth")
+        self.load(filename="solved.pth")
 
         total_reward = 0
         done = False
@@ -283,17 +286,17 @@ class DDPG_Agent:
                 total_reward += reward
                 #state = self.handle_state_shape(next_state, self.device)
                 state = torch.FloatTensor(next_state).detach().to(self.device)
-                # if done:
-                #     state, _ = env.reset()
-                #     state = torch.FloatTensor(next_state).detach().to(self.device)
-                #     print(total_reward)
-                #     total_reward=0
+                if done:
+                    state, _ = env.reset()
+                    state = torch.FloatTensor(next_state).detach().to(self.device)
+                    print(total_reward)
+                    total_reward=0
 
 
         print(f" Reward = {total_reward}")
         #env.close()
 
-    def plot_training_results(self):
+    def plot_training_results(self,filename = 'mean_training_rewards'):
         plt.figure(figsize=(18, 5))
 
         # Plot dei reward medi
@@ -324,7 +327,7 @@ class DDPG_Agent:
         plt.legend()
 
         plt.tight_layout()
-        plt.savefig('mean_training_rewards.png')
+        plt.savefig(filename + '.png')
         
 
         plt.show()

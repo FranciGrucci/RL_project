@@ -25,7 +25,7 @@ def main():
         state_dim = env.observation_space.shape[0]
         #print(state_dim)
         action_dim = env.action_space.shape[0]
-        print(action_dim)
+        #print(action_dim)
         max_action = float(env.action_space.high[0])
         #print("MAX_ACTION",max_action)
         
