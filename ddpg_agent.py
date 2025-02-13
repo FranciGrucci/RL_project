@@ -14,12 +14,11 @@ import matplotlib.pyplot as plt
 
 
 class DDPG_Agent:
-    def __init__(self, state_dim, action_dim, max_action, env, gamma=0.99, tau=0.005, lr=0.001):
+    def __init__(self, state_dim, action_dim, max_action, env, eval=False, gamma=0.99, tau=0.005, lr=0.001):
         # self.actor = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor", ckpt_dir="ckpt")
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         self.actor = Actor(state_dim=state_dim,action_dim=action_dim,max_action=max_action).to(self.device)
-
         # self.actor_target = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor_target", ckpt_dir="ckpt")
         self.actor_target = Actor(state_dim=state_dim,action_dim=action_dim,max_action=max_action).to(self.device)
         #self.actor_target.eval()
@@ -30,7 +29,7 @@ class DDPG_Agent:
         # self.critic_target = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic_target", ckpt_dir="ckpt")
         self.critic_target = Critic(state_dim=state_dim,action_dim=action_dim).to(self.device)
         #self.critic_target.eval()
-
+        self.eval = eval
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         self.actor_optimizer = optim.AdamW(self.actor.parameters(), lr=lr)
@@ -78,14 +77,14 @@ class DDPG_Agent:
     def exponential_annealing_schedule(self,n, rate,start_value):
             return start_value * np.exp(-rate * n)
 
-    def select_action(self, state, noise=0.1,eval=False):
+    def select_action(self, state, noise=0.1):
         self.actor.eval()
         with torch.no_grad():
             # if state.dim() == 1:  # Add batch dimension if state is a single image
             #     state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
             action = self.actor(state).detach().cpu().numpy()[0]
-            print(action)
-            if not eval:
+            #print(action)
+            if not self.eval:
                 action = action + np.random.normal(0, noise, size=action.shape)# self.noise.noise()   # Esplorazione
             # Limita le azioni
         self.actor.train()
@@ -262,7 +261,7 @@ class DDPG_Agent:
         """
         Valuta un agente addestrato sull'ambiente CarRacing-v2.
         """
-        self.load(filename="final_ckeckpoint.pth")
+        self.load(filename="best.pth")
 
         total_reward = 0
         done = False
@@ -276,16 +275,23 @@ class DDPG_Agent:
         state = torch.FloatTensor(state).detach().to(self.device)
 
         with torch.no_grad():
-            while not done:
-                action = self.select_action(state, noise=0.0,eval=True)
+            while True:
+                
+                action = self.select_action(state, noise=0.0)
                 next_state, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
                 total_reward += reward
                 #state = self.handle_state_shape(next_state, self.device)
                 state = torch.FloatTensor(next_state).detach().to(self.device)
+                # if done:
+                #     state, _ = env.reset()
+                #     state = torch.FloatTensor(next_state).detach().to(self.device)
+                #     print(total_reward)
+                #     total_reward=0
+
 
         print(f" Reward = {total_reward}")
-        env.close()
+        #env.close()
 
     def plot_training_results(self):
         plt.figure(figsize=(18, 5))

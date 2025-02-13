@@ -34,15 +34,18 @@ def main():
         agent.train(n_episodes=args.n_episodes,batch_size=128)
 
     if args.evaluate:
-        env = gym.make("CarRacing-v2", continuous=True,
-                       render_mode=args.render)
+        # env = gym.make("CarRacing-v2", continuous=True,
+        #                render_mode=args.render)
+        env = gym.make('InvertedPendulum-v4',render_mode="human")
         # Flatten immagine
-        state_dim = env.observation_space.shape[0] * \
-            env.observation_space.shape[1] * env.observation_space.shape[2]
+        # state_dim = env.observation_space.shape[0] * \
+        #     env.observation_space.shape[1] * env.observation_space.shape[2]
+        state_dim = env.observation_space.shape[0]
+
         action_dim = env.action_space.shape[0]
         max_action = float(env.action_space.high[0])
 
-        agent = DDPG_Agent(state_dim, action_dim, max_action, env=env)
+        agent = DDPG_Agent(state_dim, action_dim, max_action, eval=True,env=env)
 
         agent.evaluate(env)
 
