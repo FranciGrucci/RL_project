@@ -15,12 +15,19 @@ def main():
 
     args = parser.parse_args()
     if args.train:
-        env = gym.make("CarRacing-v2", continuous=True)
+        #env = gym.make("CarRacing-v2", continuous=True)
+        env = gym.make('InvertedPendulum-v4')
+
         # Flatten immagine
-        state_dim = env.observation_space.shape[0] * \
-            env.observation_space.shape[1] * env.observation_space.shape[2]
+        
+        # state_dim = env.observation_space.shape[0] * \
+        #     env.observation_space.shape[1] * env.observation_space.shape[2]
+        state_dim = env.observation_space.shape[0]
+        #print(state_dim)
         action_dim = env.action_space.shape[0]
+        print(action_dim)
         max_action = float(env.action_space.high[0])
+        #print("MAX_ACTION",max_action)
         
         agent = DDPG_Agent(state_dim, action_dim, max_action, env=env)
 

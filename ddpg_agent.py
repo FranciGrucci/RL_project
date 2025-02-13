@@ -18,17 +18,17 @@ class DDPG_Agent:
         # self.actor = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor", ckpt_dir="ckpt")
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
-        self.actor = Actor(action_dim).to(self.device)
+        self.actor = Actor(state_dim=state_dim,action_dim=action_dim,max_action=max_action).to(self.device)
 
         # self.actor_target = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor_target", ckpt_dir="ckpt")
-        self.actor_target = Actor(action_dim).to(self.device)
+        self.actor_target = Actor(state_dim=state_dim,action_dim=action_dim,max_action=max_action).to(self.device)
         #self.actor_target.eval()
         self.actor_target.load_state_dict(self.actor.state_dict())
 
         # self.critic = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic", ckpt_dir="ckpt")
-        self.critic = Critic(action_dim).to(self.device)
+        self.critic = Critic(state_dim=state_dim,action_dim=action_dim).to(self.device)
         # self.critic_target = Critic(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Critic_target", ckpt_dir="ckpt")
-        self.critic_target = Critic(action_dim).to(self.device)
+        self.critic_target = Critic(state_dim=state_dim,action_dim=action_dim).to(self.device)
         #self.critic_target.eval()
 
         self.critic_target.load_state_dict(self.critic.state_dict())
@@ -81,15 +81,17 @@ class DDPG_Agent:
     def select_action(self, state, noise=0.1,eval=False):
         self.actor.eval()
         with torch.no_grad():
-            if state.dim() == 3:  # Add batch dimension if state is a single image
-                state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
+            # if state.dim() == 1:  # Add batch dimension if state is a single image
+            #     state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
             action = self.actor(state).detach().cpu().numpy()[0]
+            print(action)
             if not eval:
                 action = action + np.random.normal(0, noise, size=action.shape)# self.noise.noise()   # Esplorazione
             # Limita le azioni
         self.actor.train()
         
-        return np.clip(action, [-1.0, 0.0, 0.0], [1.0, 1.0, 1.0])
+        #return np.clip(action, [-1.0, 0.0, 0.0], [1.0, 1.0, 1.0])
+        return np.clip(action, [-3.0], [3.0])
 
     def handle_state_shape(self, s_0, device):
         if s_0.shape == torch.Size([3, 84, 96]):  # Ensures no further crops
@@ -113,15 +115,15 @@ class DDPG_Agent:
         else:
 
             # Assuming self.s_0 has shape 1x84x3x96
-            self.s_0 = self.handle_state_shape(self.s_0, self.device)
-
+            #self.s_0 = self.handle_state_shape(self.s_0, self.device)
+            #self.s_0 = torch.FloatTensor(self.s_0).detach().to(self.device)
             action = self.select_action(self.s_0, noise=self.noise)
 
         s_1, r, terminated, truncated, _ = self.env.step(action)
-        s_1 = self.handle_state_shape(s_1, self.device)
+        #s_1 = self.handle_state_shape(s_1, self.device)
 
         done = terminated or truncated
-
+        s_1 = torch.FloatTensor(s_1).detach().to(self.device)
         # put experience in the buffer
         self.replay_buffer.push(self.s_0, action, r, done, s_1)
 
@@ -132,7 +134,8 @@ class DDPG_Agent:
         if done:
             #self.noise.reset()
             self.s_0, _ = self.env.reset()
-            self.s_0 = self.handle_state_shape(self.s_0, self.device)
+            #self.s_0 = self.handle_state_shape(self.s_0, self.device)
+            self.s_0 = torch.FloatTensor(self.s_0).detach().to(self.device)
         return done
 
     def train(self, batch_size=32, n_episodes=10):
@@ -140,27 +143,30 @@ class DDPG_Agent:
         self.critic.train()
         #self.noise.reset()
         state, _ = self.env.reset()
-        for i in range(50):
-            state,_,_,_,_ = self.env.step([0,0,0])
-        self.s_0 = self.handle_state_shape(state, self.device)
+        # for i in range(50):
+        #     state,_,_,_,_ = self.env.step([0,0,0])
+        #self.s_0 = self.handle_state_shape(state, self.device)
+        self.s_0 = torch.FloatTensor(state).detach().to(self.device)
         print("Populating buffer")
         # Populate replay buffer
         while self.replay_buffer.burn_in_capacity() < 1:
             print("\rFull {:.2f}%\t\t".format(
                 self.replay_buffer.burn_in_capacity()*100), end="")
             done = self.take_step(mode='explore')
-            if done:
-                for i in range(50):
-                    state,_,_,_,_ = self.env.step([0,0,0])
-                self.s_0 = self.handle_state_shape(state, self.device)
-
+            # if done:
+            #     # for i in range(50):
+            #     #     state,_,_,_,_ = self.env.step([0,0,0])
+            #     #self.s_0 = self.handle_state_shape(state, self.device)
+            #     self.s_0 = torch.FloatTensor(self.s_0).detach().to(self.device)
         print("\nStart training...")
 
         for episode in range(n_episodes):
             state, _ = self.env.reset()
-            for i in range(50):
-                state,_,_,_,_ = self.env.step([0,0,0])
-            self.s_0 = self.handle_state_shape(state, self.device)
+            # for i in range(50):
+            #     state,_,_,_,_ = self.env.step([0,0,0])
+            #self.s_0 = self.handle_state_shape(state, self.device)
+            self.s_0 = torch.FloatTensor(state).detach().to(self.device)
+
             self.rewards = 0
             done = False
             while not done:
@@ -256,7 +262,7 @@ class DDPG_Agent:
         """
         Valuta un agente addestrato sull'ambiente CarRacing-v2.
         """
-        self.load(filename="best.pth")
+        self.load(filename="final_ckeckpoint.pth")
 
         total_reward = 0
         done = False
@@ -264,16 +270,19 @@ class DDPG_Agent:
         #state = self.handle_state_shape(state, self.device)
         self.actor.eval()
         self.critic.eval()
-        for i in range(50):
-            state,_,_,_,_ = env.step([0,0,0])
-        state = self.handle_state_shape(state, self.device)
+        # for i in range(50):
+        #     state,_,_,_,_ = env.step([0,0,0])
+        #state = self.handle_state_shape(state, self.device)
+        state = torch.FloatTensor(state).detach().to(self.device)
+
         with torch.no_grad():
             while not done:
                 action = self.select_action(state, noise=0.0,eval=True)
                 next_state, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
                 total_reward += reward
-                state = self.handle_state_shape(next_state, self.device)
+                #state = self.handle_state_shape(next_state, self.device)
+                state = torch.FloatTensor(next_state).detach().to(self.device)
 
         print(f" Reward = {total_reward}")
         env.close()
