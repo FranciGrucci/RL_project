@@ -16,7 +16,7 @@ def main():
     args = parser.parse_args()
     if args.train:
         #env = gym.make("CarRacing-v2", continuous=True)
-        env = gym.make('InvertedPendulum-v4')
+        env = gym.make('Walker2d-v4')
 
         # Flatten immagine
         
@@ -31,12 +31,12 @@ def main():
         
         agent = DDPG_Agent(state_dim, action_dim, max_action, env=env)
 
-        agent.train(n_episodes=args.n_episodes,batch_size=128)
+        agent.train(n_episodes=args.n_episodes,batch_size=512)
 
     if args.evaluate:
         # env = gym.make("CarRacing-v2", continuous=True,
         #                render_mode=args.render)
-        env = gym.make('InvertedPendulum-v4',render_mode="human")
+        env = gym.make('HalfCheetah-v4',render_mode="human")
         # Flatten immagine
         # state_dim = env.observation_space.shape[0] * \
         #     env.observation_space.shape[1] * env.observation_space.shape[2]

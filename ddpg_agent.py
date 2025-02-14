@@ -49,7 +49,7 @@ class DDPG_Agent:
         self.mean_training_rewards = []
         self.actor_loss = []
         self.critic_loss = []
-        self.window = 10
+        self.window = 50
         self.step_count = 0
         
     def save(self, filename="ddpg_checkpoint.pth"):
@@ -80,8 +80,9 @@ class DDPG_Agent:
     def select_action(self, state, noise=0.1):
         self.actor.eval()
         with torch.no_grad():
-            # if state.dim() == 1:  # Add batch dimension if state is a single image
-            #     state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
+            #print(state.dim())
+            if state.dim() == 1:  # Add batch dimension if state is a single image
+                state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
             action = self.actor(state).detach().cpu().numpy()[0]
             #print(action)
             if not self.eval:
@@ -90,7 +91,7 @@ class DDPG_Agent:
         self.actor.train()
         
         #return np.clip(action, [-1.0, 0.0, 0.0], [1.0, 1.0, 1.0])
-        return np.clip(action, [-3.0], [3.0])
+        return np.clip(action,[-1.0, -1.0, -1.0,-1.0, -1.0, -1.0],[1.0, 1.0, 1.0,1.0, 1.0, 1.0])
 
     def handle_state_shape(self, s_0, device):
         if s_0.shape == torch.Size([3, 84, 96]):  # Ensures no further crops
