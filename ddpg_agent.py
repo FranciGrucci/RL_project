@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 
 class DDPG_Agent:
     def __init__(self, state_dim, action_dim, max_action, env, eval=False, gamma=0.99, tau=0.005, lr=0.001):
+        
+
         # self.actor = Actor(learning_rate=lr, input_dims=state_dim, fc1_dims=400, fc2_dims=300, n_actions=action_dim, name="Actor", ckpt_dir="ckpt")
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
@@ -51,6 +53,8 @@ class DDPG_Agent:
         self.critic_loss = []
         self.window = 50
         self.step_count = 0
+        self.learning_rates = []
+        self.episode_numbers = []
         
     def save(self, filename="ddpg_checkpoint.pth"):
         """Salva i parametri delle reti dell'agente."""
@@ -139,6 +143,9 @@ class DDPG_Agent:
         return done
 
     def train(self, batch_size=32, n_episodes=10):
+        initial_lr = 0.0001  # Learning rate iniziale
+        final_lr = 0.00001   # Learning rate minimo
+        decay_rate = (final_lr / initial_lr) ** (1 / n_episodes)
         self.actor.train()
         self.critic.train()
         #self.noise.reset()
@@ -200,6 +207,21 @@ class DDPG_Agent:
                 actor_loss.backward()
                 self.actor_optimizer.step()
 
+
+
+                # Aggiornamento adattivo del learning rate con vincoli min e max
+                for param_group in self.actor_optimizer.param_groups:
+                    param_group['lr'] = max(final_lr, min(initial_lr, param_group['lr'] * decay_rate))
+
+                for param_group in self.critic_optimizer.param_groups:
+                    param_group['lr'] = max(final_lr, min(initial_lr, param_group['lr'] * decay_rate))
+
+                # Salva il valore del learning rate per tracciarlo
+                self.episode_numbers.append(episode)
+                self.learning_rates.append(self.actor_optimizer.param_groups[0]['lr'])
+
+
+
                 # Soft update delle reti target
                 for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
                     target_param.data.copy_(
@@ -254,6 +276,10 @@ class DDPG_Agent:
                 break
         if train:            
             self.plot_training_results()
+            self.plot_learning_rate()
+
+            
+
         #self.plot_actor_loss()
         #self.plot_critic_loss()
 
@@ -296,6 +322,19 @@ class DDPG_Agent:
 
         print(f" Reward = {total_reward}")
         #env.close()
+
+    def plot_learning_rate(self, filename="learning_rate_curve.png"):
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.episode_numbers, self.learning_rates, label='Learning Rate', color='red')
+        plt.title('Adaptive Learning Rate Decay')
+        plt.xlabel('Episode')
+        plt.ylabel('Learning Rate')
+        plt.legend()
+        plt.grid()
+        plt.savefig(filename)  # Salva la curva
+        plt.show()
+
+
 
     def plot_training_results(self,filename = 'mean_training_rewards'):
         plt.figure(figsize=(18, 5))
