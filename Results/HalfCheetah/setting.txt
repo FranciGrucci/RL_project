@@ -1,0 +1,3 @@
+replaybuffer/burnin: 100000/60000
+window: 50
+

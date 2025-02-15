@@ -10,44 +10,49 @@ def main():
     parser = argparse.ArgumentParser(description='Run training and evaluation')
     parser.add_argument('--render', default="human")
     parser.add_argument('-t', '--train', action='store_true')
-    parser.add_argument('-e', '--evaluate', action='store_true')
+    parser.add_argument('--evaluate', type=str)
     parser.add_argument('--n_episodes', type=int, default=10)
 
     args = parser.parse_args()
     if args.train:
-        #env = gym.make("CarRacing-v2", continuous=True)
-        env = gym.make('Walker2d-v4')
 
-        # Flatten immagine
-        
-        # state_dim = env.observation_space.shape[0] * \
-        #     env.observation_space.shape[1] * env.observation_space.shape[2]
-        state_dim = env.observation_space.shape[0]
-        #print(state_dim)
-        action_dim = env.action_space.shape[0]
-        #print(action_dim)
+        env = gym.make('Hopper-v4')
+
+        state_dim = 1
+        action_dim = 1
+
+        for dim in env.observation_space.shape:
+            state_dim *= dim
+        print("State Dimension is:", state_dim)
+
+        for dim in env.action_space.shape:
+            action_dim *= dim
+        print("Action Dimension is:", action_dim)
+
         max_action = float(env.action_space.high[0])
-        #print("MAX_ACTION",max_action)
-        
-        agent = DDPG_Agent(state_dim, action_dim, max_action, env=env)
 
-        agent.train(n_episodes=args.n_episodes,batch_size=512)
+        agent = DDPG_Agent(state_dim=state_dim,
+                           action_dim=action_dim, max_action=max_action, env=env, noise=0.9,memory_size=10000000,burn_in=900000)
+        agent.train(n_episodes=args.n_episodes, batch_size=512)
 
     if args.evaluate:
-        # env = gym.make("CarRacing-v2", continuous=True,
-        #                render_mode=args.render)
-        env = gym.make('HalfCheetah-v4',render_mode="human")
-        # Flatten immagine
-        # state_dim = env.observation_space.shape[0] * \
-        #     env.observation_space.shape[1] * env.observation_space.shape[2]
-        state_dim = env.observation_space.shape[0]
+        state_dim = 1
+        action_dim = 1
+        env = gym.make('Hopper-v4', render_mode="human")
 
-        action_dim = env.action_space.shape[0]
+        for dim in env.observation_space.shape:
+            state_dim *= dim
+        print("State Dimension is:", state_dim)
+
+        for dim in env.action_space.shape:
+            action_dim *= dim
+        print("Action Dimension is:", action_dim)
+
         max_action = float(env.action_space.high[0])
 
-        agent = DDPG_Agent(state_dim, action_dim, max_action, eval=True,env=env)
-
-        agent.evaluate(env)
+        agent = DDPG_Agent(state_dim, action_dim,
+                           max_action, eval=True, env=env)
+        agent.evaluate(env,checkpoint_path=args.evaluate)
 
 
 if __name__ == '__main__':
