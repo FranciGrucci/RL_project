@@ -45,7 +45,7 @@ class DDPG_Agent:
         self.action_dim = action_dim
         self.noise = noise  # OrnsteinUhlenbeckNoise(action_dim=3)
 
-        self.reward_threshold = 1000
+        self.reward_threshold = 2000
         self.rewards = 0
         self.training_rewards = []
         self.mean_training_rewards = []
@@ -72,7 +72,7 @@ class DDPG_Agent:
         return is_weights
 
     def replay_buffer_exponential_annealing_schedule(self, n, rate, start_value=0.4):
-        return 1 - (1-start_value)*np.exp(-rate * n)  # from start_value to 1
+        return 1 - (1-start_value)*np.exp(-rate * (n/1000))  # from start_value to 1
 
     def exponential_annealing_schedule(self, n, rate, start_value=0.4):
         return start_value * np.exp(-rate * n)  # from start_value to 0
@@ -230,20 +230,21 @@ class DDPG_Agent:
                         self.tau * param.data + (1 - self.tau) * target_param.data)
 
                 if done:
-                    if (episode % 1000 == 0 and episode != 0):  # Save checkpoint
-                        self.noise = self.exponential_annealing_schedule(
-                            episode, 1e-2, start_value=self.noise)
-                        if self.noise <= 0.0001:
-                            self.noise = 0.0001
-
+                    # if (episode % 1000 == 0 and episode != 0):  # Save checkpoint
+                    #     self.noise = self.exponential_annealing_schedule(
+                    #         episode, 1e-2, start_value=self.noise)
+                    #     if self.noise <= 0.0001:
+                    #         self.noise = 0.0001
+                    
                     if (episode % 100 == 0):  # Save checkpoint
                         print("Saving...")
                         self.save(filename="checkpoint.pth")
-                        self.plot_training_results(filename="checkpoint")
+                        self.plot_training_results(filename="checkpoint",show= False)
                     
                     if (episode % 1000 == 0 and episode != 0):  # Save checkpoint
                         self.replay_buffer.beta = self.replay_buffer_exponential_annealing_schedule(
                             episode, 1e-2)
+                        print(self.replay_buffer.beta)
 
                     self.training_rewards.append(self.rewards)
                     self.update_loss = []
@@ -268,7 +269,7 @@ class DDPG_Agent:
                         print('\nEnvironment solved in {} episodes!'.format(
                             episode))
                         self.save(filename="solved.pth")
-                        self.plot_training_results(filename="solved")
+                        self.plot_training_results(filename="solved",show=True)
                         train = False
 
             if not train:
@@ -318,7 +319,7 @@ class DDPG_Agent:
         print(f" Reward = {total_reward}")
         env.close()
 
-    def plot_learning_rate(self, filename="learning_rate_curve.png"):
+    def plot_learning_rate(self, filename="learning_rate_curve.png",show =False):
         plt.figure(figsize=(10, 6))
         plt.plot(self.episode_numbers, self.learning_rates,
                  label='Learning Rate', color='red')
@@ -330,7 +331,7 @@ class DDPG_Agent:
         plt.savefig(filename)  # Salva la curva
         plt.show()
 
-    def plot_training_results(self, filename='mean_training_rewards'):
+    def plot_training_results(self, filename='mean_training_rewards',show = False):
         plt.figure(figsize=(18, 5))
 
         # Plot dei reward medi
@@ -360,5 +361,7 @@ class DDPG_Agent:
 
         plt.tight_layout()
         plt.savefig(filename + '.png')
+        if show:
 
-        plt.show()
+            plt.show()
+        plt.close()

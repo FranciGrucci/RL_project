@@ -32,7 +32,7 @@ def main():
         max_action = float(env.action_space.high[0])
 
         agent = DDPG_Agent(state_dim=state_dim,
-                           action_dim=action_dim, max_action=max_action, env=env, noise=0.9,memory_size=10000000,burn_in=900000)
+                           action_dim=action_dim, max_action=max_action, env=env, noise=0.1,memory_size=100000,burn_in=90000,alpha=0.6,beta=0.4)
         agent.train(n_episodes=args.n_episodes, batch_size=512)
 
     if args.evaluate:

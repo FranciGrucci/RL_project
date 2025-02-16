@@ -24,108 +24,143 @@ import random
 import os
 import pathlib
 
-# ---- ACTOR NETWORK ----
-class Actor(nn.Module):
-    def __init__(self, action_dim, max_action, state_dim,name= "gg",learning_rate=1e-2, fc1_dims=256, fc2_dims=256,ckpt_dir= 'ckpt'):
-        super(Actor, self).__init__()
-        self.max_action = max_action
-        self.learning_rate = learning_rate
-        self.state_dim = state_dim
-        self.fc1_dims = fc1_dims
-        self.fc2_dims = fc2_dims
-        self.action_dim = action_dim
-        self.checkpoint_file = os.path.join(ckpt_dir, name+'_ddpg')
+# # ---- ACTOR NETWORK ----
+# class Actor(nn.Module):
+#     def __init__(self, action_dim, max_action, state_dim,name= "gg",learning_rate=1e-2, fc1_dims=256, fc2_dims=256,ckpt_dir= 'ckpt'):
+#         super(Actor, self).__init__()
+#         self.max_action = max_action
+#         self.learning_rate = learning_rate
+#         self.state_dim = state_dim
+#         self.fc1_dims = fc1_dims
+#         self.fc2_dims = fc2_dims
+#         self.action_dim = action_dim
+#         self.checkpoint_file = os.path.join(ckpt_dir, name+'_ddpg')
 
-        self.fc1 = nn.Linear(self.state_dim, self.fc1_dims)
-        self.bn1 = nn.BatchNorm1d(self.fc1_dims)
+#         self.fc1 = nn.Linear(self.state_dim, self.fc1_dims)
+#         self.bn1 = nn.BatchNorm1d(self.fc1_dims)
 
-        self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims) 
-        self.bn2 = nn.BatchNorm1d(self.fc2_dims)
-        self.fc3 = nn.Linear(self.fc2_dims, self.action_dim)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.init_weights()
-        self.to(self.device)
+#         self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims) 
+#         self.bn2 = nn.BatchNorm1d(self.fc2_dims)
+#         self.fc3 = nn.Linear(self.fc2_dims, self.action_dim)
+#         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#         self.init_weights()
+#         self.to(self.device)
 
-        if not os.path.exists(ckpt_dir):
-            pathlib.Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
+#         if not os.path.exists(ckpt_dir):
+#             pathlib.Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
 
-    #inizializzazione dei pesi:
+#     #inizializzazione dei pesi:
 
-    def init_weights(self):
-        f1 = 1 / np.sqrt(self.fc1.weight.data.size()[0])
-        torch.nn.init.uniform_(self.fc1.weight.data, -f1, f1)
-        torch.nn.init.uniform_(self.fc1.bias.data, -f1, f1)
+#     def init_weights(self):
+#         f1 = 1 / np.sqrt(self.fc1.weight.data.size()[0])
+#         torch.nn.init.uniform_(self.fc1.weight.data, -f1, f1)
+#         torch.nn.init.uniform_(self.fc1.bias.data, -f1, f1)
         
-        f2 = 1 / np.sqrt(self.fc2.weight.data.size()[0])
-        torch.nn.init.uniform_(self.fc2.weight.data, -f2, f2)
-        torch.nn.init.uniform_(self.fc2.bias.data, -f2, f2)
+#         f2 = 1 / np.sqrt(self.fc2.weight.data.size()[0])
+#         torch.nn.init.uniform_(self.fc2.weight.data, -f2, f2)
+#         torch.nn.init.uniform_(self.fc2.bias.data, -f2, f2)
         
-        f3 = 1 / np.sqrt(self.fc3.weight.data.size()[0])
-        torch.nn.init.uniform_(self.fc3.weight.data, -f3, f3)
-        torch.nn.init.uniform_(self.fc3.bias.data, -f3, f3)
+#         f3 = 1 / np.sqrt(self.fc3.weight.data.size()[0])
+#         torch.nn.init.uniform_(self.fc3.weight.data, -f3, f3)
+#         torch.nn.init.uniform_(self.fc3.bias.data, -f3, f3)
 
-    def forward(self, state):
-        state = state.to(self.device)
-        x = F.relu(self.bn1(self.fc1(state)))
-        x = F.relu(self.bn2(self.fc2(x)))
-        x = torch.tanh(self.fc3(x))*self.max_action # Azioni in [-1, 1]
-        return x
+#     def forward(self, state):
+#         state = state.to(self.device)
+#         x = F.relu(self.bn1(self.fc1(state)))
+#         x = F.relu(self.bn2(self.fc2(x)))
+#         x = torch.tanh(self.fc3(x))*self.max_action # Azioni in [-1, 1]
+#         return x
     
-# ---- CRITIC NETWORK ----
+# # ---- CRITIC NETWORK ----
+# class Critic(nn.Module):
+#     def __init__(self, action_dim, state_dim,learning_rate=1e-2, fc1_dims=256, fc2_dims=256,name = "gg",ckpt_dir= 'ckpt'):
+#         super(Critic, self).__init__()
+#         self.learning_rate = learning_rate
+#         self.state_dim = state_dim
+#         self.fc1_dims = fc1_dims
+#         self.fc2_dims = fc2_dims
+#         self.action_dim = action_dim
+#         self.name = name
+
+#         self.checkpoint_file = os.path.join(ckpt_dir, name+'_ddpg')
+        
+#         self.fc1 = nn.Linear(self.state_dim, self.fc1_dims)
+#         self.bn1 = nn.BatchNorm1d(self.fc1_dims)
+#         self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
+#         self.bn2 = nn.BatchNorm1d(self.fc2_dims)
+#         self.action_value = nn.Linear(self.action_dim, self.fc2_dims)
+#         self.q = nn.Linear(self.fc2_dims, 1)
+#         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#         self.init_weights()
+#         self.to(self.device)
+
+#     # Inizializzazione dei pesi
+#     def init_weights(self):
+#          f1 = 1 /np.sqrt(self.fc1.weight.data.size()[0])
+#          torch.nn.init.uniform_(self.fc1.weight.data, -f1, f1)
+#          torch.nn.init.uniform_(self.fc1.bias.data, -f1, f1)
+
+         
+#          f2 = 1 /np.sqrt(self.fc2.weight.data.size()[0])
+#          torch.nn.init.uniform_(self.fc2.weight.data, -f2, f2)
+#          torch.nn.init.uniform_(self.fc2.bias.data, -f2, f2)
+        
+#          f_action = 1 /np.sqrt(self.action_value.weight.data.size()[0])
+#          torch.nn.init.uniform_(self.action_value.weight.data, -f_action, f_action)
+#          torch.nn.init.uniform_(self.action_value.bias.data, -f_action, f_action)
+#          f_q = 1 /np.sqrt(self.q.weight.data.size()[0])
+#          torch.nn.init.uniform_(self.q.weight.data, -f_q, f_q)
+#          torch.nn.init.uniform_(self.q.bias.data, -f_q, f_q)
+         
+#     def forward(self, state, action):
+#         print(state.shape,action.shape)
+#         state = state.to(self.device)
+#         state_value = self.fc1(state)
+#         state_value = self.bn1(state_value)
+#         state_value = F.relu(state_value)
+
+#         state_value = self.fc2(state_value)
+#         state_value = self.bn2(state_value)
+        
+#         action_value = F.relu(self.action_value(action))
+#         state_action_value = F.relu(torch.add(state_value, action_value))
+#         return self.q(state_action_value)
+
+# # ###############################################################
+########################### HOPPER ########################
+# Actor Network
+class Actor(nn.Module):
+    def __init__(self, state_dim, action_dim, max_action):
+        super(Actor, self).__init__()
+        self.fc1 = nn.Linear(state_dim, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, action_dim)
+        self.max_action = max_action
+        
+    def forward(self, state):
+        x = torch.relu(self.fc1(state))
+        x = torch.relu(self.fc2(x))
+        x = torch.tanh(self.fc3(x)) * self.max_action
+        return x
+
+#Critic Network
 class Critic(nn.Module):
-    def __init__(self, action_dim, state_dim,learning_rate=1e-2, fc1_dims=256, fc2_dims=256,name = "gg",ckpt_dir= 'ckpt'):
+    def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
-        self.learning_rate = learning_rate
-        self.state_dim = state_dim
-        self.fc1_dims = fc1_dims
-        self.fc2_dims = fc2_dims
-        self.action_dim = action_dim
-        self.name = name
-
-        self.checkpoint_file = os.path.join(ckpt_dir, name+'_ddpg')
+        self.fc_state = nn.Linear(state_dim, 256)
+        self.fc1 = nn.Linear(256 + action_dim, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, 1)
         
-        self.fc1 = nn.Linear(self.state_dim, self.fc1_dims)
-        self.bn1 = nn.BatchNorm1d(self.fc1_dims)
-        self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
-        self.bn2 = nn.BatchNorm1d(self.fc2_dims)
-        self.action_value = nn.Linear(self.action_dim, self.fc2_dims)
-        self.q = nn.Linear(self.fc2_dims, 1)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.init_weights()
-        self.to(self.device)
-
-    # Inizializzazione dei pesi
-    def init_weights(self):
-         f1 = 1 /np.sqrt(self.fc1.weight.data.size()[0])
-         torch.nn.init.uniform_(self.fc1.weight.data, -f1, f1)
-         torch.nn.init.uniform_(self.fc1.bias.data, -f1, f1)
-
-         
-         f2 = 1 /np.sqrt(self.fc2.weight.data.size()[0])
-         torch.nn.init.uniform_(self.fc2.weight.data, -f2, f2)
-         torch.nn.init.uniform_(self.fc2.bias.data, -f2, f2)
-        
-         f_action = 1 /np.sqrt(self.action_value.weight.data.size()[0])
-         torch.nn.init.uniform_(self.action_value.weight.data, -f_action, f_action)
-         torch.nn.init.uniform_(self.action_value.bias.data, -f_action, f_action)
-         f_q = 1 /np.sqrt(self.q.weight.data.size()[0])
-         torch.nn.init.uniform_(self.q.weight.data, -f_q, f_q)
-         torch.nn.init.uniform_(self.q.bias.data, -f_q, f_q)
-         
     def forward(self, state, action):
-        state = state.to(self.device)
-        state_value = self.fc1(state)
-        state_value = self.bn1(state_value)
-        state_value = F.relu(state_value)
+        state = self.fc_state(state)
+        x = torch.cat([state, action], dim=1)
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+#####################################################################
 
-        state_value = self.fc2(state_value)
-        state_value = self.bn2(state_value)
-        
-        action_value = F.relu(self.action_value(action))
-        state_action_value = F.relu(torch.add(state_value, action_value))
-        return self.q(state_action_value)
-
-# ###############################################################
 
 # ########################### HALF CHEETA########################
 # class Actor(nn.Module):
