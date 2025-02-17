@@ -49,7 +49,7 @@ class DDPG_Agent:
         self.rewards = 0
         self.training_rewards = []
         self.mean_training_rewards = []
-
+        self.mean_rewards = 0
         self.max_mean_reward = 0
 
         self.update_loss = []
@@ -72,7 +72,7 @@ class DDPG_Agent:
         return is_weights
 
     def replay_buffer_exponential_annealing_schedule(self, n, rate, start_value=0.4):
-        return 1 - (1-start_value)*np.exp(-rate * (n/1000))  # from start_value to 1
+        return 1 - (1-start_value)*np.exp(-rate * (n/500))  # from start_value to 1
 
     def exponential_annealing_schedule(self, n, rate, start_value=0.4):
         return start_value * np.exp(-rate * n)  # from start_value to 0
@@ -162,7 +162,8 @@ class DDPG_Agent:
             
         print("\nStart training...")
         train = True
-        for episode in range(n_episodes):
+        episode = 0
+        while not self.mean_rewards >= self.reward_threshold:
 
             state, _ = self.env.reset()
             self.s_0 = torch.FloatTensor(state).detach().to(self.device)
@@ -230,47 +231,49 @@ class DDPG_Agent:
                         self.tau * param.data + (1 - self.tau) * target_param.data)
 
                 if done:
+                   
                     # if (episode % 1000 == 0 and episode != 0):  # Save checkpoint
                     #     self.noise = self.exponential_annealing_schedule(
                     #         episode, 1e-2, start_value=self.noise)
                     #     if self.noise <= 0.0001:
                     #         self.noise = 0.0001
                     
-                    if (episode % 100 == 0):  # Save checkpoint
+                    if (episode % 50 == 0):  # Save checkpoint
                         print("Saving...")
                         self.save(filename="checkpoint.pth")
                         self.plot_training_results(filename="checkpoint",show= False)
                     
-                    if (episode % 1000 == 0 and episode != 0):  # Save checkpoint
+                    if (episode % 500 == 0 and episode != 0):  # Save checkpoint
                         self.replay_buffer.beta = self.replay_buffer_exponential_annealing_schedule(
                             episode, 1e-2)
                         print(self.replay_buffer.beta)
 
                     self.training_rewards.append(self.rewards)
                     self.update_loss = []
-                    mean_rewards = np.mean(
+                    self.mean_rewards = np.mean(
                         self.training_rewards[-self.window:])
                     self.actor_loss.append(
                         actor_loss.detach().cpu().item())   # Save loss
                     self.critic_loss.append(critic_loss.detach().cpu().item())
-                    self.mean_training_rewards.append(mean_rewards)
+                    self.mean_training_rewards.append(self.mean_rewards)
                     
-                    if mean_rewards > self.max_mean_reward:
+                    if self.mean_rewards > self.max_mean_reward:
                         print("Saving...")
                         self.save(filename="best.pth")
-                        self.max_mean_reward = mean_rewards
+                        self.max_mean_reward = self.mean_rewards
 
                     print(
                         "\rEpisode {:d} Mean Rewards {:.2f}  Episode reward = {:.2f} \t\t".format(
-                            episode, mean_rewards, self.rewards), end="")
+                            episode, self.mean_rewards, self.rewards), end="")
 
-                    if mean_rewards >= self.reward_threshold:
+                    if self.mean_rewards >= self.reward_threshold:
                         # training = False
                         print('\nEnvironment solved in {} episodes!'.format(
                             episode))
                         self.save(filename="solved.pth")
                         self.plot_training_results(filename="solved",show=True)
                         train = False
+                    episode +=1
 
             if not train:
                 break
@@ -314,7 +317,15 @@ class DDPG_Agent:
                     print(total_reward)
                     total_reward = 0
                     # time.sleep(10)
-                    self.load(filename=checkpoint_path)
+                    loaded = False
+                    while not loaded:
+                        try:
+                            self.load(filename=checkpoint_path)
+                            loaded = True
+                            break  # Exit loop if successful
+                        except Exception as e:
+                            print("Loading failed... trying again in 5 seconds")
+                            time.sleep(5)
 
         print(f" Reward = {total_reward}")
         env.close()
