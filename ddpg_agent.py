@@ -10,6 +10,7 @@ from ornsteinuhlebeck import OrnsteinUhlenbeckNoise
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from exp_replay_buff import Experience_replay_buffer
+from torch.utils.tensorboard import SummaryWriter
 
 # ---- DDPG AGENT ----
 
@@ -36,9 +37,9 @@ class DDPG_Agent:
             state_dim=state_dim, action_dim=action_dim).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
 
-        self.replay_buffer = Experience_replay_buffer(
-            device=self.device, memory_size=memory_size, burn_in=burn_in, alpha=alpha, beta=beta)  # ReplayBuffer(device=self.device)
-
+        self.replay_buffer =  ReplayBuffer(device=self.device) #Experience_replay_buffer(
+            #device=self.device, memory_size=memory_size, burn_in=burn_in, alpha=alpha, beta=beta)  # ReplayBuffer(device=self.device)
+        
         self.gamma = gamma
         self.tau = tau
         self.max_action = max_action
@@ -72,7 +73,7 @@ class DDPG_Agent:
         return is_weights
 
     def replay_buffer_exponential_annealing_schedule(self, n, rate, start_value=0.4):
-        return 1 - (1-start_value)*np.exp(-rate * (n/500))  # from start_value to 1
+        return 1 - (1-start_value)*np.exp(-rate * (n/100))  # from start_value to 1
 
     def exponential_annealing_schedule(self, n, rate, start_value=0.4):
         return start_value * np.exp(-rate * n)  # from start_value to 0
@@ -90,7 +91,7 @@ class DDPG_Agent:
 
     def load(self, filename="ddpg_checkpoint.pth"):
         """Carica i parametri delle reti dell'agente."""
-        checkpoint = torch.load(filename)
+        checkpoint = torch.load(filename,map_location="cpu")
         self.actor.load_state_dict(checkpoint["actor_state_dict"])
         self.critic.load_state_dict(checkpoint["critic_state_dict"])
         self.actor_optimizer.load_state_dict(
@@ -130,7 +131,7 @@ class DDPG_Agent:
         done = terminated or truncated
 
         # put experience in the buffer
-        self.replay_buffer.append(self.s_0, action, r, done, s_1)
+        self.replay_buffer.push(self.s_0, action, r, done, s_1)
 
         self.rewards += r
 
@@ -185,17 +186,17 @@ class DDPG_Agent:
 
                 self.critic_optimizer.zero_grad()
                 
-                is_weights = self.compute_weight()
-                is_weights = (torch.Tensor(is_weights)
-                              .view((-1))).to(self.device)
+                # is_weights = self.compute_weight()
+                # is_weights = (torch.Tensor(is_weights)
+                #               .view((-1))).to(self.device)
 
                 # Optimize Critic
                 current_Q = self.critic(
                     states, actions)
 
-                # critic_loss = F.mse_loss(current_Q, target_Q)
-                critic_loss = (is_weights * F.mse_loss(current_Q,
-                               target_Q, reduction='none')).mean()
+                critic_loss = F.mse_loss(current_Q, target_Q)
+                # critic_loss = (is_weights * F.mse_loss(current_Q,
+                #                target_Q, reduction='none')).mean()
 
                 critic_loss.backward()
                 self.critic_optimizer.step()
@@ -207,8 +208,8 @@ class DDPG_Agent:
                 actor_loss.backward()
                 self.actor_optimizer.step()
 
-                self.replay_buffer.replay_memory["priority"][self.replay_buffer.sampled_priorities] = (
-                    target_Q-current_Q).abs().cpu().detach().numpy().flatten() + 1e-6
+                # self.replay_buffer.replay_memory["priority"][self.replay_buffer.sampled_priorities] = (
+                #     target_Q-current_Q).abs().cpu().detach().numpy().flatten() + 1e-6
 
                 # # Aggiornamento adattivo del learning rate con vincoli min e max
                 # for param_group in self.actor_optimizer.param_groups:
@@ -243,10 +244,10 @@ class DDPG_Agent:
                         self.save(filename="checkpoint.pth")
                         self.plot_training_results(filename="checkpoint",show= False)
                     
-                    if (episode % 500 == 0 and episode != 0):  # Save checkpoint
-                        self.replay_buffer.beta = self.replay_buffer_exponential_annealing_schedule(
-                            episode, 1e-2)
-                        print(self.replay_buffer.beta)
+                    # if (episode % 100 == 0 and episode != 0):  # Save checkpoint
+                    #     self.replay_buffer.beta = self.replay_buffer_exponential_annealing_schedule(
+                    #         episode, 1e-2)
+                    #     print(self.replay_buffer.beta)
 
                     self.training_rewards.append(self.rewards)
                     self.update_loss = []

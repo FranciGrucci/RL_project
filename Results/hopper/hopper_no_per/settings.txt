@@ -1,0 +1,3 @@
+batch = 64
+memory_size=100000,burn_in=90000
+gaussian no per
