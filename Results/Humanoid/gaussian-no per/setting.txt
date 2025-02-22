@@ -1,3 +1,0 @@
-batch= 64
-gaussian NO per
-
