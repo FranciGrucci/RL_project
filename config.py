@@ -1,7 +1,6 @@
 from replay_buffer import ReplayBuffer, Experience_replay_buffer
-#from exp_replay_buff import Experience_replay_buffer
 import torch
-from ornsteinuhlebeck import OrnsteinUhlenbeckNoise
+from noise import OrnsteinUhlenbeckNoise, GaussianNoise
 import gymnasium as gym
 
 DEVICE = torch.device(
@@ -23,38 +22,46 @@ def compute_dimension(env):
 ################### [TRAIN]##############################################
 
 
-ENV_NAME = 'Humanoid-v4'
+ENV_NAME = 'Hopper-v4'
 ENV = gym.make(ENV_NAME)
 DIMENSIONS = compute_dimension(ENV)
 MAX_ACTION = float(ENV.action_space.high[0])
 
 TAU = 0.05
 GAMMA = 0.99
-CRITIC_LR = 1e-4
-ACTOR_LR = 1e-4
+CRITIC_LR = 1e-3
+ACTOR_LR = 1e-3
 BATCH_SIZE = 64
 MU = 0
 SIGMA = 0.2
 THETA = 0.15
 DT = 0.01
 X0 = None
-NOISE = OrnsteinUhlenbeckNoise(
-    action_dim=DIMENSIONS["action_dim"], mu=MU, sigma=SIGMA, theta=THETA, dt=DT, x0=None)  # 0.1
+MEAN = 0
+STD = 0.1
+NOISE = GaussianNoise(MEAN, STD, action_dim=DIMENSIONS["action_dim"])
+# NOISE = OrnsteinUhlenbeckNoise(
+#    action_dim=DIMENSIONS["action_dim"], mu=MU, sigma=SIGMA, theta=THETA, dt=DT, x0=None)
 CHECKPOINT_FREQUENCY = 50
+
+##########################################################################
+
 ################### [BUFFER]##############################################
 # Uncomment the required buffer and comment the other
 
-MEMORY_SIZE = 1000
+MEMORY_SIZE = 100
 BURN_IN = 90
 
-# replay_buffer = ReplayBuffer(device=device,max_size=memory_size,burn_in = burn_in)
+replay_buffer = ReplayBuffer(
+    device=DEVICE, max_size=MEMORY_SIZE, burn_in=BURN_IN)
 
 ALPHA = 0.6
 BETA = 0.4
 BETA_UPDATE_FREQUENCY = 100
 
-replay_buffer = Experience_replay_buffer(
-    device=DEVICE, memory_size=MEMORY_SIZE, burn_in=BURN_IN, alpha=ALPHA, beta=BETA,beta_update_frequency=BETA_UPDATE_FREQUENCY)
+# replay_buffer = Experience_replay_buffer(
+#     device=DEVICE, memory_size=MEMORY_SIZE, burn_in=BURN_IN, alpha=ALPHA, beta=BETA,beta_update_frequency=BETA_UPDATE_FREQUENCY)
+
 ###########################################################################
 
 train_dict = {

@@ -34,7 +34,7 @@ class ReplayBufferInterface(ABC):
         pass
 
     @abstractmethod
-    def on_next_episode():
+    def on_next_episode(self):
         pass
 
 # ---- REPLAY BUFFER ----
@@ -70,7 +70,7 @@ class ReplayBuffer(ReplayBufferInterface):
     def burn_in_capacity(self):
         return len(self.buffer) / self.burn_in
 
-    def on_next_episode():
+    def on_next_episode(self):
         return
 
     def compute_loss(self, actor, actor_optimizer, critic, critic_optimizer, states, actions, target_Q):
@@ -92,6 +92,9 @@ class ReplayBuffer(ReplayBufferInterface):
         actor_loss.backward()
         actor_optimizer.step()
         return actor_loss, critic_loss
+
+    def __str__(self):
+        return f"Replay Buffer"
 
 
 class Experience_replay_buffer(ReplayBufferInterface):
@@ -215,4 +218,7 @@ class Experience_replay_buffer(ReplayBufferInterface):
             self.beta = self.replay_buffer_exponential_annealing_schedule(
                 n=self.episode, rate=1e-2, start_value=self.beta0)
             print(f"Beta current value: {self.beta}")
-        self.episode+=1
+        self.episode += 1
+
+    def __str__(self):
+        return f"Replay Buffer with PER"

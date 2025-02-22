@@ -11,19 +11,19 @@ import matplotlib.pyplot as plt
 
 
 class DDPG_Agent:
-    def __init__(self, env, state_dim, action_dim, max_action,device, replay_buffer, eval=False, noise=0.1, gamma=0.99, tau=0.005, actor_lr=0.001, critic_lr=0.001, memory_size=50000, burn_in=40000):
+    def __init__(self, env, state_dim, action_dim, max_action, device, replay_buffer, noise, eval=False, gamma=0.99, tau=0.005, actor_lr=0.001, critic_lr=0.001, memory_size=50000, burn_in=40000):
 
         self.device = device
         ############################## ACTOR #####################################################
         self.actor = Actor(state_dim=state_dim, action_dim=action_dim,
                            max_action=max_action).to(self.device)
-        
+
         self.actor_optimizer = optim.AdamW(
             self.actor.parameters(), lr=actor_lr)
 
         self.actor_target = Actor(
             state_dim=state_dim, action_dim=action_dim, max_action=max_action).to(self.device)
-        
+
         self.actor_target.load_state_dict(self.actor.state_dict())
 
         #########################################################################################
@@ -49,7 +49,7 @@ class DDPG_Agent:
         self.max_action = max_action
         self.action_dim = action_dim
         self.noise = noise
-        
+
         self.reward_threshold = 2000
         self.rewards = 0
         self.training_rewards = []
@@ -68,13 +68,6 @@ class DDPG_Agent:
 
         self.env = env
         self.eval = eval
-
-    def replay_buffer_exponential_annealing_schedule(self, n, rate, start_value=0.4):
-        # from start_value to 1
-        return 1 - (1-start_value)*np.exp(-rate * (n/100))
-
-    def exponential_annealing_schedule(self, n, rate, start_value=0.4):
-        return start_value * np.exp(-rate * n)  # from start_value to 0
 
     def save(self, filename="ddpg_checkpoint.pth"):
         """Salva i parametri delle reti dell'agente."""
@@ -98,7 +91,7 @@ class DDPG_Agent:
             checkpoint["critic_optimizer_state_dict"])
         print(f"Modello caricato da {filename}")
 
-    def select_action(self, state, noise=0.1):
+    def select_action(self, state):
         self.actor.eval()
 
         with torch.no_grad():
@@ -106,12 +99,8 @@ class DDPG_Agent:
                 state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
             action = self.actor(state).detach().cpu().numpy()[0]
             if not self.eval:
-                if type(self.noise) == float:
-                    # self.noise.noise()   # Esplorazione
-                    action = action + \
-                        np.random.normal(0, noise, size=action.shape)
-                else:
-                    action = action + self.noise.sample()
+                print("SI")
+                action = action + self.noise.sample()
 
         self.actor.train()
 
@@ -125,7 +114,7 @@ class DDPG_Agent:
 
         else:
 
-            action = self.select_action(self.s_0, noise=self.noise)
+            action = self.select_action(self.s_0)
 
         s_1, r, terminated, truncated, _ = self.env.step(action)
         s_1 = torch.FloatTensor(s_1).detach().to(self.device)
@@ -140,18 +129,18 @@ class DDPG_Agent:
         self.s_0 = s_1.clone()
 
         if done:
-            self.noise.reset()
+            self.noise.on_next_episode()
             self.s_0, _ = self.env.reset()
             self.s_0 = torch.FloatTensor(self.s_0).detach().to(self.device)
         return done
 
-    def train(self, batch_size=32,checkpoint_frequency = 50):
+    def train(self, batch_size=32, checkpoint_frequency=50):
         # = 0.0001  # Learning rate iniziale
         # final_lr = 0.00001   # Learning rate minimo
         # decay_rate = (final_lr / initial_lr) ** (1 / n_episodes)
         self.actor.train()
         self.critic.train()
-        self.noise.reset()
+        self.noise.on_next_episode()
         state, _ = self.env.reset()
         self.s_0 = torch.FloatTensor(state).detach().to(self.device)
         print("Populating buffer")
@@ -167,7 +156,7 @@ class DDPG_Agent:
         train = True
         episode = 0
         while not self.mean_rewards >= self.reward_threshold:
-            self.noise.reset()
+            self.noise.on_next_episode()
             state, _ = self.env.reset()
             self.s_0 = torch.FloatTensor(state).detach().to(self.device)
             self.rewards = 0
@@ -186,7 +175,8 @@ class DDPG_Agent:
                     target_Q = self.critic_target(next_states, next_actions)
                     target_Q = rewards + (1 - dones) * self.gamma * target_Q
 
-                actor_loss,critic_loss = self.replay_buffer.compute_loss(actor = self.actor,actor_optimizer=self.actor_optimizer,critic = self.critic,critic_optimizer=self.critic_optimizer,states = states,actions = actions, target_Q =target_Q)
+                actor_loss, critic_loss = self.replay_buffer.compute_loss(
+                    actor=self.actor, actor_optimizer=self.actor_optimizer, critic=self.critic, critic_optimizer=self.critic_optimizer, states=states, actions=actions, target_Q=target_Q)
 
                 # Soft update delle reti target
                 for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
@@ -231,14 +221,15 @@ class DDPG_Agent:
                         self.plot_training_results(
                             filename="solved", show=True)
                         train = False
-                    episode += 1
-                    self.replay_buffer.on_next_episode()
+                    else:
+                        episode += 1
+                        self.replay_buffer.on_next_episode()
 
             if not train:
                 break
         if train:
-            self.plot_training_results()
-            
+            self.plot_training_results(show=False)
+
         self.save(filename="final_ckeckpoint.pth")
         self.env.close()
 
@@ -259,7 +250,7 @@ class DDPG_Agent:
         with torch.no_grad():
             while True:
 
-                action = self.select_action(state, noise=0.0)
+                action = self.select_action(state)
                 next_state, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
                 total_reward += reward
