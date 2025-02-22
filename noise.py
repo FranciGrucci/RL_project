@@ -48,7 +48,7 @@ class GaussianNoise:
         self.shape = action_dim
 
     def sample(self):
-        """Draw random samples following Gaussuan noise. Sample will have dimension = action_dim
+        """Draw random sample following Gaussian noise. Sample will have dimension = action_dim
 
         Returns:
             array: random sample of dimension action_dim

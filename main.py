@@ -1,7 +1,6 @@
 import argparse
 import gymnasium as gym
 from ddpg_agent import DDPG_Agent
-import time
 import config
 
 

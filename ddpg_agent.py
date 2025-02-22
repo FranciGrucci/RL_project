@@ -81,7 +81,7 @@ class DDPG_Agent:
         self.eval = eval
 
     def save(self, filename="ddpg_checkpoint.pth"):
-        """Load checkpoint
+        """Save checkpoint
 
         Args:
             filename (str, optional): checkpoint filename. Defaults to "ddpg_checkpoint.pth".
@@ -114,7 +114,7 @@ class DDPG_Agent:
         """Select action for current state
 
         Args:
-            state (Torch): State tensor
+            state (Tensor): State tensor
 
         Returns:
             Array: Action array + noise if self.eval = True. Action array otherwise

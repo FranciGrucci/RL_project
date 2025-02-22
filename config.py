@@ -51,7 +51,7 @@ THETA = 0.15
 DT = 0.01
 X0 = None
 # NOISE = OrnsteinUhlenbeckNoise(
-#    action_dim=DIMENSIONS["action_dim"], mu=MU, sigma=SIGMA, theta=THETA, dt=DT, x0=None)
+#    action_dim=DIMENSIONS["action_dim"], mu=MU, sigma=SIGMA, theta=THETA, dt=DT, x0=X0)
 ####
 
 ### Gaussian noise ###

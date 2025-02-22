@@ -43,8 +43,9 @@ class ReplayBufferInterface(ABC):
 class ReplayBuffer(ReplayBufferInterface):
     """Replay buffer class.
 
-    
+
     """
+
     def __init__(self, device, max_size=1000000, burn_in=90000):
         """Replay buffer init function
 
@@ -160,7 +161,7 @@ class Experience_replay_buffer(ReplayBufferInterface):
         self.Buffer = namedtuple('Buffer',
                                  field_names=['state', 'action', 'reward', 'done', 'next_state'])
         self.replay_memory = np.empty(self.memory_size, dtype=[(
-            "priority", np.float32), ("experience", self.Buffer)]) 
+            "priority", np.float32), ("experience", self.Buffer)])
 
         self.priorities = np.array([])
         self.priorities_prob = np.array([])
