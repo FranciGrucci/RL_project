@@ -33,5 +33,5 @@ class OrnsteinUhlenbeckNoise:
         self.state += dx
         return self.state
 
-    def __repr__(self):
-        return f"OrnsteinUhlenbeckNoise(mu={self.mu}, sigma={self.sigma})"
+    def __str__(self):
+        return f"Ornstein-Uhlenbeck Noise"

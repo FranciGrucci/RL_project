@@ -3,47 +3,53 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from replay_buffer import ReplayBuffer
 import numpy as np
 import time
-from ornsteinuhlebeck import OrnsteinUhlenbeckNoise
-from tqdm import tqdm
 import matplotlib.pyplot as plt
-from exp_replay_buff import Experience_replay_buffer
-from torch.utils.tensorboard import SummaryWriter
 
 # ---- DDPG AGENT ----
 
 
 class DDPG_Agent:
-    def __init__(self, state_dim, action_dim, max_action, env, eval=False,noise = 0.1, gamma=0.99, tau=0.005, actor_lr=0.001,critic_lr=0.001,final_actor_lr = 0.0001, final_critic_lr = 0.0001, memory_size=50000, burn_in=40000, alpha=1, beta=0):
+    def __init__(self, env, state_dim, action_dim, max_action,device, replay_buffer, eval=False, noise=0.1, gamma=0.99, tau=0.005, actor_lr=0.001, critic_lr=0.001, memory_size=50000, burn_in=40000):
 
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
-
+        self.device = device
+        ############################## ACTOR #####################################################
         self.actor = Actor(state_dim=state_dim, action_dim=action_dim,
                            max_action=max_action).to(self.device)
-        self.actor_optimizer = optim.AdamW(self.actor.parameters(), lr=actor_lr)
+        
+        self.actor_optimizer = optim.AdamW(
+            self.actor.parameters(), lr=actor_lr)
 
         self.actor_target = Actor(
             state_dim=state_dim, action_dim=action_dim, max_action=max_action).to(self.device)
+        
         self.actor_target.load_state_dict(self.actor.state_dict())
+
+        #########################################################################################
+
+        ############################ CRITIC #####################################################
 
         self.critic = Critic(state_dim=state_dim,
                              action_dim=action_dim).to(self.device)
-        self.critic_optimizer = optim.AdamW(self.critic.parameters(), lr=critic_lr)
+
+        self.critic_optimizer = optim.AdamW(
+            self.critic.parameters(), lr=critic_lr)
 
         self.critic_target = Critic(
             state_dim=state_dim, action_dim=action_dim).to(self.device)
-        self.critic_target.load_state_dict(self.critic.state_dict())
 
-        self.replay_buffer = ReplayBuffer(device=self.device,max_size=memory_size,burn_in = burn_in) #ReplayBuffer(device=self.device,max_size=memory_size,burn_in = burn_in)   #Experience_replay_buffer(device=self.device, memory_size=memory_size, burn_in=burn_in, alpha=alpha, beta=beta)
-        
+        self.critic_target.load_state_dict(self.critic.state_dict())
+        ############################################################################################
+
+        self.replay_buffer = replay_buffer
+
         self.gamma = gamma
         self.tau = tau
         self.max_action = max_action
         self.action_dim = action_dim
-        self.noise = noise #OrnsteinUhlenbeckNoise(action_dim=action_dim) #noise  
+        self.noise = noise
+        
         self.reward_threshold = 2000
         self.rewards = 0
         self.training_rewards = []
@@ -63,15 +69,9 @@ class DDPG_Agent:
         self.env = env
         self.eval = eval
 
-    def compute_weight(self):
-        is_weights = self.replay_buffer.replay_memory["priority"][self.replay_buffer.sampled_priorities]
-        is_weights *= self.replay_buffer._buffer_length
-        is_weights = ((is_weights)**(-self.replay_buffer.beta))
-        is_weights /= is_weights.max()
-        return is_weights
-
     def replay_buffer_exponential_annealing_schedule(self, n, rate, start_value=0.4):
-        return 1 - (1-start_value)*np.exp(-rate * (n/100))  # from start_value to 1
+        # from start_value to 1
+        return 1 - (1-start_value)*np.exp(-rate * (n/100))
 
     def exponential_annealing_schedule(self, n, rate, start_value=0.4):
         return start_value * np.exp(-rate * n)  # from start_value to 0
@@ -89,7 +89,7 @@ class DDPG_Agent:
 
     def load(self, filename="ddpg_checkpoint.pth"):
         """Carica i parametri delle reti dell'agente."""
-        checkpoint = torch.load(filename,map_location="cpu")
+        checkpoint = torch.load(filename, map_location="cpu")
         self.actor.load_state_dict(checkpoint["actor_state_dict"])
         self.critic.load_state_dict(checkpoint["critic_state_dict"])
         self.actor_optimizer.load_state_dict(
@@ -107,8 +107,9 @@ class DDPG_Agent:
             action = self.actor(state).detach().cpu().numpy()[0]
             if not self.eval:
                 if type(self.noise) == float:
-                # self.noise.noise()   # Esplorazione
-                    action = action + np.random.normal(0, noise, size=action.shape)
+                    # self.noise.noise()   # Esplorazione
+                    action = action + \
+                        np.random.normal(0, noise, size=action.shape)
                 else:
                     action = action + self.noise.sample()
 
@@ -144,10 +145,10 @@ class DDPG_Agent:
             self.s_0 = torch.FloatTensor(self.s_0).detach().to(self.device)
         return done
 
-    def train(self, batch_size=32, n_episodes=10):
+    def train(self, batch_size=32,checkpoint_frequency = 50):
         # = 0.0001  # Learning rate iniziale
-        #final_lr = 0.00001   # Learning rate minimo
-        #decay_rate = (final_lr / initial_lr) ** (1 / n_episodes)
+        # final_lr = 0.00001   # Learning rate minimo
+        # decay_rate = (final_lr / initial_lr) ** (1 / n_episodes)
         self.actor.train()
         self.critic.train()
         self.noise.reset()
@@ -161,7 +162,7 @@ class DDPG_Agent:
             print("\rFull {:.2f}%\t\t".format(
                 self.replay_buffer.burn_in_capacity()*100), end="")
             done = self.take_step(mode='explore')
-            
+
         print("\nStart training...")
         train = True
         episode = 0
@@ -185,43 +186,7 @@ class DDPG_Agent:
                     target_Q = self.critic_target(next_states, next_actions)
                     target_Q = rewards + (1 - dones) * self.gamma * target_Q
 
-                self.critic_optimizer.zero_grad()
-                
-                # is_weights = self.compute_weight()
-                # is_weights = (torch.Tensor(is_weights)
-                #               .view((-1))).to(self.device)
-
-                # Optimize Critic
-                current_Q = self.critic(
-                    states, actions)
-
-                critic_loss = F.mse_loss(current_Q, target_Q)
-                # critic_loss = (is_weights * F.mse_loss(current_Q,
-                #                target_Q, reduction='none')).mean()
-
-                critic_loss.backward()
-                self.critic_optimizer.step()
-
-                self.actor_optimizer.zero_grad()
-
-                # Optimize Actor (maximize Q-value)
-                actor_loss = -self.critic(states, self.actor(states)).mean()
-                actor_loss.backward()
-                self.actor_optimizer.step()
-
-                # self.replay_buffer.replay_memory["priority"][self.replay_buffer.sampled_priorities] = (
-                #     target_Q-current_Q).abs().cpu().detach().numpy().flatten() + 1e-6
-
-                # # Aggiornamento adattivo del learning rate con vincoli min e max
-                # for param_group in self.actor_optimizer.param_groups:
-                #     param_group['lr'] = max(final_lr, min(initial_lr, param_group['lr'] * decay_rate))
-
-                # for param_group in self.critic_optimizer.param_groups:
-                #     param_group['lr'] = max(final_lr, min(initial_lr, param_group['lr'] * decay_rate))
-
-                # # Salva il valore del learning rate per tracciarlo
-                # self.episode_numbers.append(episode)
-                # self.learning_rates.append(self.actor_optimizer.param_groups[0]['lr'])
+                actor_loss,critic_loss = self.replay_buffer.compute_loss(actor = self.actor,actor_optimizer=self.actor_optimizer,critic = self.critic,critic_optimizer=self.critic_optimizer,states = states,actions = actions, target_Q =target_Q)
 
                 # Soft update delle reti target
                 for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
@@ -233,22 +198,12 @@ class DDPG_Agent:
                         self.tau * param.data + (1 - self.tau) * target_param.data)
 
                 if done:
-                   
-                    # if (episode % 1000 == 0 and episode != 0):  # Save checkpoint
-                    #     self.noise = self.exponential_annealing_schedule(
-                    #         episode, 1e-2, start_value=self.noise)
-                    #     if self.noise <= 0.0001:
-                    #         self.noise = 0.0001
-                    
-                    if (episode % 50 == 0):  # Save checkpoint
+
+                    if (episode % checkpoint_frequency == 0):  # Save checkpoint
                         print("Saving...")
                         self.save(filename="checkpoint.pth")
-                        self.plot_training_results(filename="checkpoint",show= False)
-                    
-                    # if (episode % 100 == 0 and episode != 0):  # Save checkpoint
-                    #     self.replay_buffer.beta = self.replay_buffer_exponential_annealing_schedule(
-                    #         episode, 1e-2)
-                    #     print(self.replay_buffer.beta)
+                        self.plot_training_results(
+                            filename="checkpoint", show=False)
 
                     self.training_rewards.append(self.rewards)
                     self.update_loss = []
@@ -258,7 +213,7 @@ class DDPG_Agent:
                         actor_loss.detach().cpu().item())   # Save loss
                     self.critic_loss.append(critic_loss.detach().cpu().item())
                     self.mean_training_rewards.append(self.mean_rewards)
-                    
+
                     if self.mean_rewards > self.max_mean_reward:
                         print("Saving...")
                         self.save(filename="best.pth")
@@ -273,19 +228,17 @@ class DDPG_Agent:
                         print('\nEnvironment solved in {} episodes!'.format(
                             episode))
                         self.save(filename="solved.pth")
-                        self.plot_training_results(filename="solved",show=True)
+                        self.plot_training_results(
+                            filename="solved", show=True)
                         train = False
-                    episode +=1
+                    episode += 1
+                    self.replay_buffer.on_next_episode()
 
             if not train:
                 break
         if train:
             self.plot_training_results()
-            # self.plot_learning_rate()
-
-            # self.plot_actor_loss()
-            # self.plot_critic_loss()
-
+            
         self.save(filename="final_ckeckpoint.pth")
         self.env.close()
 
@@ -300,7 +253,7 @@ class DDPG_Agent:
         state, _ = env.reset()
         self.actor.eval()
         self.critic.eval()
-        
+
         state = torch.FloatTensor(state).detach().to(self.device)
 
         with torch.no_grad():
@@ -310,7 +263,6 @@ class DDPG_Agent:
                 next_state, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
                 total_reward += reward
-                # state = self.handle_state_shape(next_state, self.device)
                 state = torch.FloatTensor(next_state).detach().to(self.device)
                 if done:
                     state, _ = env.reset()
@@ -332,7 +284,7 @@ class DDPG_Agent:
         print(f" Reward = {total_reward}")
         env.close()
 
-    def plot_learning_rate(self, filename="learning_rate_curve.png",show =False):
+    def plot_learning_rate(self, filename="learning_rate_curve.png", show=False):
         plt.figure(figsize=(10, 6))
         plt.plot(self.episode_numbers, self.learning_rates,
                  label='Learning Rate', color='red')
@@ -344,7 +296,7 @@ class DDPG_Agent:
         plt.savefig(filename)  # Salva la curva
         plt.show()
 
-    def plot_training_results(self, filename='mean_training_rewards',show = False):
+    def plot_training_results(self, filename='mean_training_rewards', show=False):
         plt.figure(figsize=(18, 5))
 
         # Plot dei reward medi
