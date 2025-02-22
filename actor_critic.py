@@ -13,52 +13,38 @@ import torch.nn as nn
 import torch.nn.functional as F
 import time
 
-
-########################### HUMANOID ########################
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 512)
-        self.bn1 = nn.LayerNorm(512)  # Changed to LayerNorm
-        self.fc2 = nn.Linear(512, 512)
-        self.bn2 = nn.LayerNorm(512)  # Changed to LayerNorm
-        self.fc3 = nn.Linear(512, action_dim)
-        self.max_action = max_action
+        self.l1 = nn.Linear(state_dim, 400)
+        self.bn1 = nn.LayerNorm(400)
+        self.l2 = nn.Linear(400, 300)
+        self.bn2 = nn.LayerNorm(300)
+        self.l3 = nn.Linear(300, action_dim)
         
+        self.max_action = max_action
+
     def forward(self, state):
-        x = torch.relu(self.bn1(self.fc1(state)))  # ReLU before normalization
-        x = torch.relu(self.bn2(self.fc2(x)))
-        x = torch.tanh(self.fc3(x)) * self.max_action
-        return x
+        x = F.relu(self.bn1(self.l1(state)))
+        x = F.relu(self.bn2(self.l2(x)))
+        return self.max_action * torch.tanh(self.l3(x))
 
 class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
-        self.fc_state = nn.Linear(state_dim, 512)
-        self.bn_state = nn.LayerNorm(512)  # Changed to LayerNorm
+        self.l1 = nn.Linear(state_dim + action_dim, 400)
+        self.bn1 = nn.LayerNorm(400)
+        self.l2 = nn.Linear(400, 300)
+        self.bn2 = nn.LayerNorm(300)
+        self.l3 = nn.Linear(300, 1)
 
-        self.fc_action = nn.Linear(action_dim, 512)  # Normalize action separately
-        self.bn_action = nn.LayerNorm(512)  # Changed to LayerNorm
-
-        self.fc1 = nn.Linear(512 + 512, 512)  # Adjusted input size
-        self.bn1 = nn.LayerNorm(512)
-        self.fc2 = nn.Linear(512, 512)
-        self.bn2 = nn.LayerNorm(512)
-        self.fc3 = nn.Linear(512, 1)
-        
     def forward(self, state, action):
-        state = torch.relu(self.bn_state(self.fc_state(state)))
-        action = torch.relu(self.bn_action(self.fc_action(action)))
+        x = torch.cat([state, action], 1)
+        x = F.relu(self.bn1(self.l1(x)))
+        x = F.relu(self.bn2(self.l2(x)))
+        return self.l3(x)
 
-        x = torch.cat([state, action], dim=1)  # Concatenate after normalization
-        x = torch.relu(self.bn1(self.fc1(x)))
-        x = torch.relu(self.bn2(self.fc2(x)))
-        x = self.fc3(x)
-        return x
-
-#####################################################################
-# ########################### HOPPER ########################
-# # Actor Network
+# ########################## HOPPER ########################
 # import torch
 # import torch.nn as nn
 # import torch.nn.functional as F
@@ -67,51 +53,34 @@ class Critic(nn.Module):
 #     def __init__(self, state_dim, action_dim, max_action):
 #         super(Actor, self).__init__()
 #         self.fc1 = nn.Linear(state_dim, 256)
-#         self.bn1 = nn.BatchNorm1d(256)
+#         self.ln1 = nn.LayerNorm(256)
 #         self.fc2 = nn.Linear(256, 256)
-#         self.bn2 = nn.BatchNorm1d(256)
+#         self.ln2 = nn.LayerNorm(256)
 #         self.fc3 = nn.Linear(256, action_dim)
 #         self.max_action = max_action
         
 #     def forward(self, state):
-#         x = self.fc1(state)
-#         x = self.bn1(x)
-#         x = torch.relu(x)
-        
-#         x = self.fc2(x)
-#         x = self.bn2(x)
-#         x = torch.relu(x)
-        
+#         x = F.relu(self.ln1(self.fc1(state)))
+#         x = F.relu(self.ln2(self.fc2(x)))
 #         x = torch.tanh(self.fc3(x)) * self.max_action
 #         return x
 
 # class Critic(nn.Module):
 #     def __init__(self, state_dim, action_dim):
 #         super(Critic, self).__init__()
-#         self.fc_state = nn.Linear(state_dim, 256)
-#         self.bn_state = nn.BatchNorm1d(256)
-#         self.fc1 = nn.Linear(256 + action_dim, 256)
-#         self.bn1 = nn.BatchNorm1d(256)
+#         self.fc1 = nn.Linear(state_dim + action_dim, 256)
+#         self.ln1 = nn.LayerNorm(256)
 #         self.fc2 = nn.Linear(256, 256)
-#         self.bn2 = nn.BatchNorm1d(256)
+#         self.ln2 = nn.LayerNorm(256)
 #         self.fc3 = nn.Linear(256, 1)
         
 #     def forward(self, state, action):
-#         state = self.fc_state(state)
-#         state = self.bn_state(state)
-#         state = torch.relu(state)
-        
 #         x = torch.cat([state, action], dim=1)
-#         x = self.fc1(x)
-#         x = self.bn1(x)
-#         x = torch.relu(x)
-        
-#         x = self.fc2(x)
-#         x = self.bn2(x)
-#         x = torch.relu(x)
-        
+#         x = F.relu(self.ln1(self.fc1(x)))
+#         x = F.relu(self.ln2(self.fc2(x)))
 #         x = self.fc3(x)
 #         return x
+
 # #####################################################################
 
 

@@ -28,7 +28,7 @@ class OrnsteinUhlenbeckNoise:
     def reset(self):
         self.state = self.x0 if self.x0 is not None else np.zeros(self.action_dim)
 
-    def noise(self):
+    def sample(self):
         dx = self.theta * (self.mu - self.state) * self.dt + self.sigma * np.sqrt(self.dt) * np.random.normal(size=self.action_dim)
         self.state += dx
         return self.state

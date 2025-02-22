@@ -5,7 +5,7 @@ import gymnasium as gym
 from ddpg_agent import DDPG_Agent
 import time
 
-
+from ornsteinuhlebeck import OrnsteinUhlenbeckNoise
 def main():
     parser = argparse.ArgumentParser(description='Run training and evaluation')
     parser.add_argument('--render', default="human")
@@ -20,7 +20,7 @@ def main():
 
         state_dim = 1
         action_dim = 1
-
+        print(env.observation_space.sample().shape)
         for dim in env.observation_space.shape:
             state_dim *= dim
         print("State Dimension is:", state_dim)
@@ -31,8 +31,10 @@ def main():
 
         max_action = float(env.action_space.high[0])
         print("Max Action",max_action)
+        noise = OrnsteinUhlenbeckNoise(action_dim=action_dim)#0.1#OrnsteinUhlenbeckNoise(action_dim=action_dim)
+        print("Using noise: ",type(noise))
         agent = DDPG_Agent(state_dim=state_dim,
-                           action_dim=action_dim, max_action=max_action, env=env, noise=0.1,memory_size=1000000,burn_in=90000,alpha=0.6,beta=0.4,actor_lr=1e-4,critic_lr=1e-4)
+                           action_dim=action_dim, max_action=max_action, env=env, noise=noise,memory_size=1000000,burn_in=90000,alpha=0.6,beta=0.4,actor_lr=1e-4,critic_lr=1e-4)
         agent.train(n_episodes=args.n_episodes, batch_size=64)
 
     if args.evaluate:

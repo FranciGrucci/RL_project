@@ -37,15 +37,13 @@ class DDPG_Agent:
             state_dim=state_dim, action_dim=action_dim).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
 
-        self.replay_buffer =  ReplayBuffer(device=self.device) #Experience_replay_buffer(
-            #device=self.device, memory_size=memory_size, burn_in=burn_in, alpha=alpha, beta=beta)  # ReplayBuffer(device=self.device)
+        self.replay_buffer = ReplayBuffer(device=self.device,max_size=memory_size,burn_in = burn_in) #ReplayBuffer(device=self.device,max_size=memory_size,burn_in = burn_in)   #Experience_replay_buffer(device=self.device, memory_size=memory_size, burn_in=burn_in, alpha=alpha, beta=beta)
         
         self.gamma = gamma
         self.tau = tau
         self.max_action = max_action
         self.action_dim = action_dim
-        self.noise = noise  # OrnsteinUhlenbeckNoise(action_dim=3)
-
+        self.noise = noise #OrnsteinUhlenbeckNoise(action_dim=action_dim) #noise  
         self.reward_threshold = 2000
         self.rewards = 0
         self.training_rewards = []
@@ -60,7 +58,7 @@ class DDPG_Agent:
         self.learning_rates = []
         self.episode_numbers = []
 
-        self.window = 10
+        self.window = 20
 
         self.env = env
         self.eval = eval
@@ -108,8 +106,11 @@ class DDPG_Agent:
                 state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
             action = self.actor(state).detach().cpu().numpy()[0]
             if not self.eval:
+                if type(self.noise) == float:
                 # self.noise.noise()   # Esplorazione
-                action = action + np.random.normal(0, noise, size=action.shape)
+                    action = action + np.random.normal(0, noise, size=action.shape)
+                else:
+                    action = action + self.noise.sample()
 
         self.actor.train()
 
@@ -138,7 +139,7 @@ class DDPG_Agent:
         self.s_0 = s_1.clone()
 
         if done:
-            # self.noise.reset()
+            self.noise.reset()
             self.s_0, _ = self.env.reset()
             self.s_0 = torch.FloatTensor(self.s_0).detach().to(self.device)
         return done
@@ -149,7 +150,7 @@ class DDPG_Agent:
         #decay_rate = (final_lr / initial_lr) ** (1 / n_episodes)
         self.actor.train()
         self.critic.train()
-        # self.noise.reset()
+        self.noise.reset()
         state, _ = self.env.reset()
         self.s_0 = torch.FloatTensor(state).detach().to(self.device)
         print("Populating buffer")
@@ -165,7 +166,7 @@ class DDPG_Agent:
         train = True
         episode = 0
         while not self.mean_rewards >= self.reward_threshold:
-
+            self.noise.reset()
             state, _ = self.env.reset()
             self.s_0 = torch.FloatTensor(state).detach().to(self.device)
             self.rewards = 0

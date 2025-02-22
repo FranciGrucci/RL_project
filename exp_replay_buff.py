@@ -42,7 +42,7 @@ class Experience_replay_buffer:
 
         return states, actions, rewards, dones, next_states
 
-    def append(self, s_0, a, r, d, s_1):
+    def push(self, s_0, a, r, d, s_1):
         priority = 1.0 if self._buffer_length == 0 else self.replay_memory["priority"].max(
         )
         if self._buffer_length == self.memory_size:

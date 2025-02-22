@@ -8,9 +8,9 @@ import time
 
 
 class ReplayBuffer:
-    def __init__(self, device, max_size=100000):
+    def __init__(self, device, max_size=1000000, burn_in = 90000 ):
         self.buffer = deque(maxlen=max_size)
-        self.burn_in = 60000
+        self.burn_in = burn_in
         self.device = device
 
     def push(self, state, action, reward, done, next_state):
