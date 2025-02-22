@@ -24,10 +24,22 @@ Defines the Actor-Critic model classes. It includes predefined models for:
 To use a specific model, uncomment the corresponding section and comment out the others.
 
 ### `ddpg_agent.py`
-Contains the implementation of the DDPG agent, along with its:
+Contains the implementation of the DDPG agent class, along with its:
 
 - Training function
 - Evaluation function
+
+### `replay_buffer.py`
+Contains the implementation of two replay buffers classes:
+
+- Replay Buffer
+- Replay Buffer with PER
+
+### `noise.py`
+Contains the implementation of two noise classes:
+
+- Gaussian
+- Ornstein-Uhlenbeteck
 
 ## Usage
 
