@@ -28,7 +28,7 @@ def compute_dimension(env):
     return {"state_dim": state_dim, "action_dim": action_dim}
 
 
-ENV_NAME = 'Hopper-v4'
+ENV_NAME = 'Humanoid-v4'
 ENV = gym.make(ENV_NAME)
 
 ################### [TRAIN] ##############################################
