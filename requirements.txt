@@ -1,6 +1,4 @@
-gymnasium[mujoco]  # Ambiente MuJoCo tramite Gymnasium
-numpy               # Operazioni numeriche
-torch               # Framework per le reti neurali (puoi sostituirlo con TensorFlow se preferisci)
-matplotlib          # Per visualizzare risultati e grafici
-tqdm                # Per monitorare il progresso dell'addestramento
-cnn             # Libreria per la creazione di reti neurali
+gymnasium[mujoco]  
+numpy               
+torch              
+matplotlib      
