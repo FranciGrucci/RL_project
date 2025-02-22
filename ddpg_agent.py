@@ -11,8 +11,26 @@ import matplotlib.pyplot as plt
 
 
 class DDPG_Agent:
-    def __init__(self, env, state_dim, action_dim, max_action, device, replay_buffer, noise, eval=False, gamma=0.99, tau=0.005, actor_lr=0.001, critic_lr=0.001, memory_size=50000, burn_in=40000):
+    """DDPG agent class
+    """
 
+    def __init__(self, env, state_dim, action_dim, max_action, device, replay_buffer, noise, eval=False, gamma=0.99, tau=0.005, actor_lr=0.001, critic_lr=0.001):
+        """DDPG agent init function
+
+        Args:
+            env : Gymnasium environment
+            state_dim (int): State dimension
+            action_dim (int): number of actions
+            max_action (float): maximum allowed action value
+            device: "cuda" or "cpu"
+            replay_buffer: Replay buffer object
+            noise: Noise object
+            eval (bool, optional): True when the agent is in evaluation mode. Defaults to False.
+            gamma (float, optional): discount factor. Defaults to 0.99.
+            tau (float, optional): Soft update tau. Defaults to 0.005.
+            actor_lr (float, optional): Actor learning rate. Defaults to 0.001.
+            critic_lr (float, optional): Critic learning rate. Defaults to 0.001.
+        """
         self.device = device
         ############################## ACTOR #####################################################
         self.actor = Actor(state_dim=state_dim, action_dim=action_dim,
@@ -50,19 +68,15 @@ class DDPG_Agent:
         self.action_dim = action_dim
         self.noise = noise
 
-        self.reward_threshold = 2000
+        self.reward_threshold = 2000 # Mean reward goal
         self.rewards = 0
         self.training_rewards = []
         self.mean_training_rewards = []
         self.mean_rewards = 0
         self.max_mean_reward = 0
 
-        self.update_loss = []
         self.actor_loss = []
         self.critic_loss = []
-
-        self.learning_rates = []
-        self.episode_numbers = []
 
         self.window = 20
 
@@ -70,7 +84,11 @@ class DDPG_Agent:
         self.eval = eval
 
     def save(self, filename="ddpg_checkpoint.pth"):
-        """Salva i parametri delle reti dell'agente."""
+        """Load checkpoint
+
+        Args:
+            filename (str, optional): checkpoint filename. Defaults to "ddpg_checkpoint.pth".
+        """
         checkpoint = {
             "actor_state_dict": self.actor.state_dict(),
             "critic_state_dict": self.critic.state_dict(),
@@ -81,7 +99,11 @@ class DDPG_Agent:
         print(f"Modello salvato in {filename}")
 
     def load(self, filename="ddpg_checkpoint.pth"):
-        """Carica i parametri delle reti dell'agente."""
+        """Load checkpoint.
+
+        Args:
+            filename (str, optional): checkpoint filename. Defaults to "ddpg_checkpoint.pth".
+        """
         checkpoint = torch.load(filename, map_location="cpu")
         self.actor.load_state_dict(checkpoint["actor_state_dict"])
         self.critic.load_state_dict(checkpoint["critic_state_dict"])
@@ -92,14 +114,21 @@ class DDPG_Agent:
         print(f"Modello caricato da {filename}")
 
     def select_action(self, state):
+        """Select action for current state
+
+        Args:
+            state (Torch): State tensor
+
+        Returns:
+            Array: Action array + noise if self.eval = True. Action array otherwise
+        """
         self.actor.eval()
 
         with torch.no_grad():
             if state.dim() == 1:  # Add batch dimension if single sample
-                state = state.unsqueeze(0)  # Shape becomes (1, C, H, W)
+                state = state.unsqueeze(0)
             action = self.actor(state).detach().cpu().numpy()[0]
             if not self.eval:
-                print("SI")
                 action = action + self.noise.sample()
 
         self.actor.train()
@@ -108,6 +137,14 @@ class DDPG_Agent:
         return np.clip(action, -self.max_action * np.ones(self.action_dim), self.max_action * np.ones(self.action_dim))
 
     def take_step(self, mode='exploit'):
+        """Step wrapper
+
+        Args:
+            mode (str, optional): {exploit, explore}. If "explore", the environment action space is sampled. Otherwise, the action is chosen accordingly to select_action(). Defaults to 'exploit'.
+
+        Returns:
+            bool: True if done. False otherwise
+        """
 
         if mode == 'explore':
             action = self.env.action_space.sample()
@@ -135,12 +172,16 @@ class DDPG_Agent:
         return done
 
     def train(self, batch_size=32, checkpoint_frequency=50):
-        # = 0.0001  # Learning rate iniziale
-        # final_lr = 0.00001   # Learning rate minimo
-        # decay_rate = (final_lr / initial_lr) ** (1 / n_episodes)
+        """Train loop
+
+        Args:
+            batch_size (int, optional): Batch size. Defaults to 32.
+            checkpoint_frequency (int, optional): Number of episodes after which the checkpoint is created. Defaults to 50.
+        """
         self.actor.train()
         self.critic.train()
-        self.noise.on_next_episode()
+
+        self.noise.on_next_episode()  # Reset the noise, useful with Ornstein-Uhlenbeck
         state, _ = self.env.reset()
         self.s_0 = torch.FloatTensor(state).detach().to(self.device)
         print("Populating buffer")
@@ -153,8 +194,9 @@ class DDPG_Agent:
             done = self.take_step(mode='explore')
 
         print("\nStart training...")
-        train = True
+        train = True  # Flag
         episode = 0
+        # Train until objective is not reached (Based on manual abortion)
         while not self.mean_rewards >= self.reward_threshold:
             self.noise.on_next_episode()
             state, _ = self.env.reset()
@@ -162,7 +204,7 @@ class DDPG_Agent:
             self.rewards = 0
             done = False
 
-            while not done:
+            while not done:  # Episode loop
                 done = self.take_step(mode="exploit")
 
                 states, actions, rewards, dones, next_states = self.replay_buffer.sample_batch(
@@ -178,7 +220,7 @@ class DDPG_Agent:
                 actor_loss, critic_loss = self.replay_buffer.compute_loss(
                     actor=self.actor, actor_optimizer=self.actor_optimizer, critic=self.critic, critic_optimizer=self.critic_optimizer, states=states, actions=actions, target_Q=target_Q)
 
-                # Soft update delle reti target
+                # Target networks soft updates
                 for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
                     target_param.data.copy_(
                         self.tau * param.data + (1 - self.tau) * target_param.data)
@@ -187,7 +229,7 @@ class DDPG_Agent:
                     target_param.data.copy_(
                         self.tau * param.data + (1 - self.tau) * target_param.data)
 
-                if done:
+                if done:  # Episode is over
 
                     if (episode % checkpoint_frequency == 0):  # Save checkpoint
                         print("Saving...")
@@ -195,16 +237,16 @@ class DDPG_Agent:
                         self.plot_training_results(
                             filename="checkpoint", show=False)
 
+                    # Collect data for stats and plots
                     self.training_rewards.append(self.rewards)
-                    self.update_loss = []
                     self.mean_rewards = np.mean(
                         self.training_rewards[-self.window:])
                     self.actor_loss.append(
-                        actor_loss.detach().cpu().item())   # Save loss
+                        actor_loss.detach().cpu().item())
                     self.critic_loss.append(critic_loss.detach().cpu().item())
                     self.mean_training_rewards.append(self.mean_rewards)
 
-                    if self.mean_rewards > self.max_mean_reward:
+                    if self.mean_rewards > self.max_mean_reward:  # New max mean reward reached
                         print("Saving...")
                         self.save(filename="best.pth")
                         self.max_mean_reward = self.mean_rewards
@@ -213,29 +255,29 @@ class DDPG_Agent:
                         "\rEpisode {:d} Mean Rewards {:.2f}  Episode reward = {:.2f} \t\t".format(
                             episode, self.mean_rewards, self.rewards), end="")
 
-                    if self.mean_rewards >= self.reward_threshold:
-                        # training = False
+                    if self.mean_rewards >= self.reward_threshold:  # Objective reached
                         print('\nEnvironment solved in {} episodes!'.format(
                             episode))
                         self.save(filename="solved.pth")
                         self.plot_training_results(
                             filename="solved", show=True)
-                        train = False
-                    else:
+                        train = False  # Signal that train is over
+                    else:  # Move to next episode
                         episode += 1
                         self.replay_buffer.on_next_episode()
 
+            # Exit the Train loop when objective is reached (hence train is false)
             if not train:
                 break
-        if train:
-            self.plot_training_results(show=False)
 
-        self.save(filename="final_ckeckpoint.pth")
         self.env.close()
 
     def evaluate(self, env, checkpoint_path):
-        """
-        Valuta un agente addestrato sull'ambiente CarRacing-v2.
+        """Agent evaluation function
+
+        Args:
+            env: Gymnasium environment
+            checkpoint_path (str): Checkpoint path
         """
         self.load(filename=checkpoint_path)
 
@@ -275,29 +317,23 @@ class DDPG_Agent:
         print(f" Reward = {total_reward}")
         env.close()
 
-    def plot_learning_rate(self, filename="learning_rate_curve.png", show=False):
-        plt.figure(figsize=(10, 6))
-        plt.plot(self.episode_numbers, self.learning_rates,
-                 label='Learning Rate', color='red')
-        plt.title('Adaptive Learning Rate Decay')
-        plt.xlabel('Episode')
-        plt.ylabel('Learning Rate')
-        plt.legend()
-        plt.grid()
-        plt.savefig(filename)  # Salva la curva
-        plt.show()
-
     def plot_training_results(self, filename='mean_training_rewards', show=False):
+        """Plot training results and save on png file.
+
+        Args:
+            filename (str, optional): Image file name. Defaults to 'mean_training_rewards'.
+            show (bool, optional): If true, show the plot. Defaults to False.
+        """
         plt.figure(figsize=(18, 5))
 
-        # Plot dei reward medi
+        # Mean reward plot
         plt.subplot(1, 3, 1)
         plt.plot(self.mean_training_rewards)
         plt.title("Mean Training Rewards")
         plt.xlabel("Episodes")
         plt.ylabel("Reward")
 
-        # Plot delle loss
+        # Loss plot
 
         plt.subplot(1, 3, 2)
         plt.plot(self.actor_loss, label="Actor Loss")
@@ -318,6 +354,6 @@ class DDPG_Agent:
         plt.tight_layout()
         plt.savefig(filename + '.png')
         if show:
-
             plt.show()
+
         plt.close()
