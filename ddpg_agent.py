@@ -68,7 +68,6 @@ class DDPG_Agent:
         self.action_dim = action_dim
         self.noise = noise
 
-        self.reward_threshold = 2000 # Mean reward goal
         self.rewards = 0
         self.training_rewards = []
         self.mean_training_rewards = []
@@ -77,8 +76,6 @@ class DDPG_Agent:
 
         self.actor_loss = []
         self.critic_loss = []
-
-        self.window = 20
 
         self.env = env
         self.eval = eval
@@ -171,7 +168,7 @@ class DDPG_Agent:
             self.s_0 = torch.FloatTensor(self.s_0).detach().to(self.device)
         return done
 
-    def train(self, batch_size=32, checkpoint_frequency=50):
+    def train(self, batch_size=32, checkpoint_frequency=50,window = 20,mean_reward_threshold=2000):
         """Train loop
 
         Args:
@@ -194,10 +191,11 @@ class DDPG_Agent:
             done = self.take_step(mode='explore')
 
         print("\nStart training...")
+        
         train = True  # Flag
         episode = 0
         # Train until objective is not reached (Based on manual abortion)
-        while not self.mean_rewards >= self.reward_threshold:
+        while not self.mean_rewards >= mean_reward_threshold:
             self.noise.on_next_episode()
             state, _ = self.env.reset()
             self.s_0 = torch.FloatTensor(state).detach().to(self.device)
@@ -240,7 +238,7 @@ class DDPG_Agent:
                     # Collect data for stats and plots
                     self.training_rewards.append(self.rewards)
                     self.mean_rewards = np.mean(
-                        self.training_rewards[-self.window:])
+                        self.training_rewards[-window:])
                     self.actor_loss.append(
                         actor_loss.detach().cpu().item())
                     self.critic_loss.append(critic_loss.detach().cpu().item())
@@ -255,7 +253,7 @@ class DDPG_Agent:
                         "\rEpisode {:d} Mean Rewards {:.2f}  Episode reward = {:.2f} \t\t".format(
                             episode, self.mean_rewards, self.rewards), end="")
 
-                    if self.mean_rewards >= self.reward_threshold:  # Objective reached
+                    if self.mean_rewards >= mean_reward_threshold:  # Objective reached
                         print('\nEnvironment solved in {} episodes!'.format(
                             episode))
                         self.save(filename="solved.pth")

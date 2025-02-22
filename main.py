@@ -27,7 +27,7 @@ def main():
 
         agent = DDPG_Agent(**train_dict)
         agent.train(batch_size=config.BATCH_SIZE,
-                    checkpoint_frequency=config.CHECKPOINT_FREQUENCY)
+                    checkpoint_frequency=config.CHECKPOINT_FREQUENCY,mean_reward_threshold=config.MEAN_REWARD_THRESHOLD,window=config.WINDOW)
 
     if args.evaluate:
         eval_dict = config.train_dict

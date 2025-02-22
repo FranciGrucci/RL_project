@@ -42,7 +42,8 @@ BATCH_SIZE = 64
 
 TAU = 0.05  # Soft update tau value
 GAMMA = 0.99
-
+MEAN_REWARD_THRESHOLD = 2000 # Goal Mean reward threshold 
+WINDOW = 20 #Window of episodes rewards to consider for computing the mean.
 ### Ornstein-Uhlenbeck noise ###
 MU = 0
 SIGMA = 0.2
